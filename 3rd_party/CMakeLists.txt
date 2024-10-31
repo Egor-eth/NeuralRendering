@@ -16,6 +16,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_compile_options(-g)
 endif()
 
-add_compile_options(-fPIC)
+add_compile_options(-fPIC -w)
 
 include(properties.cmake)
