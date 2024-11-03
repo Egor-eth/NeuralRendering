@@ -4,3 +4,7 @@
 [submodule "3rd_party/heavy_rt"]
 	path = 3rd_party/heavy_rt
 	url = https://github.com/RomanRodionov/HeavyRT.git
+[submodule "3rd_party/LiteScene"]
+	path = 3rd_party/LiteScene
+	url = https://github.com/msu-graphics-group/LiteScene.git
+	branch = gltf2hydra
