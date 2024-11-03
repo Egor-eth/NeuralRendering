@@ -15,7 +15,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_compile_options(nrend_app_compile_options INTERFACE -g)
 endif()
 
-
 include(properties.cmake)
 
 add_executable(${MODULE_NAME}

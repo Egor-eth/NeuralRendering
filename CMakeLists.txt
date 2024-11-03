@@ -12,6 +12,7 @@ target_compile_features(nrend_project_compile_options INTERFACE cxx_std_20)
 
 set(NREND_PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 set(NREND_SRC_DIR ${NREND_PROJECT_ROOT}/src)
+set(NREND_EXTERNAL_DIR ${NREND_PROJECT_ROOT}/3rd_party)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
