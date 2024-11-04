@@ -99,7 +99,8 @@ bool N_BVH::LoadSceneGLTF(std::string a_path)
 
   if(!loaded)
   {
-    std::cerr << "Cannot load glTF scene from: " << a_path << std::endl;;
+    std::cerr << "Cannot load glTF scene from: " << a_path << std::endl;
+    std::cerr << error << a_path << std::endl;
     return false;
   }
 
@@ -123,7 +124,6 @@ bool N_BVH::LoadSceneGLTF(std::string a_path)
       std::cerr << "Orthographic camera not supported!" << std::endl;
     }
   }
-
 
   // load and instance geometry
   std::vector<uint64_t> trisPerObject;
