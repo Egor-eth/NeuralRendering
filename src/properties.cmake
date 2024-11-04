@@ -1,5 +1,6 @@
 set(LOADER_EXTERNAL_SRC
-        ${NREND_EXTERNAL_DIR}/LiteScene/loader_utils/load_gltf.cpp
+        ${NREND_EXTERNAL_DIR}/LiteScene/loader_utils/gltf_loader.cpp
+        ${NREND_EXTERNAL_DIR}/LiteScene/loader_utils/gltf_loader_def.cpp
         ${NREND_EXTERNAL_DIR}/LiteScene/pugixml.cpp
         ${NREND_EXTERNAL_DIR}/LiteScene/hydraxml.cpp
         ${NREND_EXTERNAL_DIR}/LiteScene/cmesh4.cpp)
@@ -9,7 +10,8 @@ set(CROSSRT_EXTERNAL_SRC
 
 set(NRENDER_SRC    
         main.cpp
-        build_bvh.cpp)
+        nbvh.cpp
+        nbvh_host.cpp)
 
 set(MODULE_NAME nrender)
 
