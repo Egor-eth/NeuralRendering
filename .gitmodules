@@ -1,6 +1,6 @@
 [submodule "3rd_party/neural_core"]
 	path = 3rd_party/neural_core
-	url = git@github.com:msu-graphics-group/LiteNN.git
+	url = https://github.com/msu-graphics-group/LiteNN.git
 [submodule "3rd_party/heavy_rt"]
 	path = 3rd_party/heavy_rt
 	url = https://github.com/RomanRodionov/HeavyRT.git
