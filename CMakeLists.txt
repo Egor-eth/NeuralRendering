@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.24)
 
-include(cmake/kernel_slicer.cmake)
+option(ENABLE_VULKAN "Include GPU support for neural networks with Kernel Slicer" OFF)
 
-find_package(LLVM 17 REQUIRED CONFIG)
-find_package(Clang 17 REQUIRED)
 
+
+if(ENABLE_VULKAN)
+
+    find_package(LLVM 17 REQUIRED CONFIG)
+    find_package(Clang 17 REQUIRED)
+
+    include(cmake/kernel_slicer.cmake)
+endif()
 project(LearnOpenGL CXX)
 
 add_library(nrend_project_compile_options INTERFACE)

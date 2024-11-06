@@ -1,7 +1,6 @@
-include_directories(src
-                    "3rd_party"
-                    "3rd_party/LiteScene"
-                    "3rd_party/LiteScene/loader_utils"
-                    "3rd_party/heavy_rt/core"
-                    "3rd_party/heavy_rt/core/common"
-                    "3rd_party/LiteMath")
+include_directories(src)
+include_directories(3rd_party)
+include_directories(3rd_party/LiteScene)
+include_directories(3rd_party/LiteScene/loader_utils)
+include_directories(3rd_party/heavy_rt/core)
+include_directories(3rd_party/heavy_rt/core/common)

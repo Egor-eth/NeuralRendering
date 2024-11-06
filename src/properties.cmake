@@ -17,4 +17,5 @@ set(MODULE_SOURCES
 
 set(MODULE_LIBS
         HeavyRT
+        LiteMath
 )
