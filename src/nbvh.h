@@ -1,6 +1,7 @@
 #include "BVH2CommonRT.h"
 #include "gltf_loader.h"
 #include "IRenderer.h"
+#include "neural_core/src/neural_network.h"
 
 #include <string>
 #include <memory>
@@ -36,8 +37,13 @@ public:
   bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor) override;
 #endif
 
+  void SetNetwork();
+  void TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData);
+  void InferenceNetwork(std::vector<float> inputData, std::vector<float>& outputData);
+
   void Clear (uint32_t a_width, uint32_t a_height, const char* a_what) override;
-  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum) override;
+  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum) override {};
+  void Render(uint32_t* imageData, float* depthData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum);
   void SetViewport(int a_xStart, int a_yStart, int a_width, int a_height) override;
 
   void SetAccelStruct(std::shared_ptr<ISceneObject> a_customAccelStruct) override { m_pAccelStruct = a_customAccelStruct;}
@@ -70,17 +76,19 @@ protected:
   #ifdef KERNEL_SLICER
   void CastRaySingle(uint32_t tidX, uint32_t* out_color __attribute__((size("tidX"))));
   #else
-  void CastRaySingle(uint32_t tidX, uint32_t* out_color);
+  void CastRaySingle(uint32_t tidX, uint32_t* out_color, float* out_depth);
   #endif
 
-  virtual void CastRaySingleBlock(uint32_t tidX, uint32_t* out_color, uint32_t a_numPasses = 1);
+  virtual void CastRaySingleBlock(uint32_t tidX, uint32_t* out_color, float* out_depth, uint32_t a_numPasses = 1);
 
   void kernel_InitEyeRay(uint32_t tidX, LiteMath::float4* rayPosAndNear, LiteMath::float4* rayDirAndFar);
-  void kernel_RayTrace(uint32_t tidX, const LiteMath::float4* rayPosAndNear, const LiteMath::float4* rayDirAndFar, uint32_t* out_color);
+  void kernel_RayTrace(uint32_t tidX, const LiteMath::float4* rayPosAndNear, const LiteMath::float4* rayDirAndFar, uint32_t* out_color, float* out_depth);
 
   uint32_t m_width;
   uint32_t m_height;
   uint32_t m_measureOverhead = 0;
+
+  nn::NeuralNetwork nn;
 
   int m_gltfCamId = -1;
   LiteMath::float4x4 m_projInv;

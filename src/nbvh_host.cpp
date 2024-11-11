@@ -319,14 +319,40 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////NEURAL//PART//////////////////////////////////////////
 
-void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
+void N_BVH::SetNetwork()
 {
-  CastRaySingleBlock(a_width*a_height, a_outColor, a_passNum);
+  nn.set_batch_size_for_evaluate(2048);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 2, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64,  1), nn::Initializer::Siren);
 }
 
-void N_BVH::CastRaySingleBlock(uint32_t tidX, uint32_t * out_color, uint32_t a_numPasses)
+void N_BVH::TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData)
+{
+  nn.train(inputData, outputData, 1000, 25000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
+}
+
+void N_BVH::InferenceNetwork(std::vector<float> inputData, std::vector<float>& outputData)
+{
+  nn.evaluate(inputData, outputData);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+void N_BVH::Render(uint32_t* a_outColor, float* out_depth, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
+{
+  CastRaySingleBlock(a_width*a_height, a_outColor, out_depth, a_passNum);
+}
+
+void N_BVH::CastRaySingleBlock(uint32_t tidX, uint32_t * out_color, float* out_depth, uint32_t a_numPasses)
 {
   profiling::Timer timer;
   
@@ -336,27 +362,9 @@ void N_BVH::CastRaySingleBlock(uint32_t tidX, uint32_t * out_color, uint32_t a_n
   #endif
   #endif
   for(int i=0;i<tidX;i++)
-    CastRaySingle(i, out_color);
+    CastRaySingle(i, out_color, out_depth);
 
-  //printf("CastSingleRayBlock...\n");
-  //
-  //auto a_width  = tidX;
-  //auto a_height = tidY;
-  //m_avgLCV = 0.0;
-  //
-  //#ifndef _DEBUG
-  //#ifndef ENABLE_METRICS
-  //#pragma omp parallel for collapse (2)
-  //#endif
-  //#endif
-  //for (int j = 0; j < int(a_height); j+=BSIZE)
-  //  for (int i = 0; i < int(a_width); i+=BSIZE)
-  //    CastRayPacket(i, j, out_color);
-  //
-  //m_avgLCV /= double( (a_height*a_width)/(BSIZE*BSIZE) );
-  //
   timeDataByName["CastRaySingleBlock"] = timer.getElapsedTime().asMilliseconds();
-  //printf("CastRaySingleBlock %8.3f sec\n", timer.getElapsedTime().asSeconds());
 }
 
 const char* N_BVH::Name() const
@@ -399,6 +407,3 @@ void N_BVH::GetExecutionTime(const char* a_funcName, float a_out[4])
     return;
   a_out[0] = p->second;
 }
-
-
-IRenderer* MakeEyeRayShooterRenderer(const char* a_name) { return new N_BVH; }

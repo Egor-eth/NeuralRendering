@@ -1,34 +1,18 @@
 #include "nbvh.h"
 #include "render_common.h"
 
-void N_BVH::CastRaySingle(uint32_t tidX, uint32_t* out_color)
+void N_BVH::CastRaySingle(uint32_t tidX, uint32_t* out_color, float* out_depth)
 {
-  //const uint XY = m_pakedXY[tidX];
-  //const uint x  = (XY & 0x0000FFFF);
-  //const uint y  = (XY & 0xFFFF0000) >> 16;
-  //if(x >= 50 && y == 450)
-  //{
-  //  int a = 2; // put debug breakpoint here
-  //}
   float4 rayPosAndNear, rayDirAndFar;
   kernel_InitEyeRay(tidX, &rayPosAndNear, &rayDirAndFar);
-  kernel_RayTrace  (tidX, &rayPosAndNear, &rayDirAndFar, out_color);
+  kernel_RayTrace  (tidX, &rayPosAndNear, &rayDirAndFar, out_color, out_depth);
 }
-
-//bool g_debugPrint = false;
 
 void N_BVH::kernel_InitEyeRay(uint32_t tidX, float4* rayPosAndNear, float4* rayDirAndFar)
 {
   const uint XY = m_packedXY[tidX];
   const uint x  = (XY & 0x0000FFFF);
   const uint y  = (XY & 0xFFFF0000) >> 16;
-  
-  //if(x == 37 && y == 450)
-  //{
-  //  g_debugPrint = true;
-  //}
-  //else
-  //  g_debugPrint = false;
 
   float3 rayDir = EyeRayDirNormalized((float(x)+0.5f)/float(m_width), (float(y)+0.5f)/float(m_height), m_projInv);
   float3 rayPos = float3(0,0,0);
@@ -41,7 +25,7 @@ void N_BVH::kernel_InitEyeRay(uint32_t tidX, float4* rayPosAndNear, float4* rayD
 }
 
 void N_BVH::kernel_RayTrace(uint32_t tidX, const float4* rayPosAndNear,
-                                   const float4* rayDirAndFar, uint32_t* out_color)
+                                   const float4* rayDirAndFar, uint32_t* out_color, float* out_depth)
 {
   const float4 rayPos = *rayPosAndNear;
   const float4 rayDir = *rayDirAndFar ;
@@ -53,6 +37,7 @@ void N_BVH::kernel_RayTrace(uint32_t tidX, const float4* rayPosAndNear,
     const uint x  = (XY & 0x0000FFFF);
     const uint y  = (XY & 0xFFFF0000) >> 16;
     out_color[y * m_width + x] = (hit.primId == 0xFFFFFFFF) ? 0 : m_palette[(hit.primId) % palette_size];
+    out_depth[y * m_width + x] = hit.t;
   }
   else
   {
@@ -61,6 +46,7 @@ void N_BVH::kernel_RayTrace(uint32_t tidX, const float4* rayPosAndNear,
     const uint x  = (XY & 0x0000FFFF);
     const uint y  = (XY & 0xFFFF0000) >> 16;
     out_color[y * m_width + x] = RealColorToUint32(colorF);
+    out_depth[y * m_width + x] = 0.f;
   }
 }
 
@@ -134,13 +120,6 @@ void N_BVH::PackXY(uint tidX, uint tidY)
 
 void N_BVH::PackXYBlock(uint tidX, uint tidY, uint a_passNum)
 {
-  //for(int y=0; y < 16; y++) {
-  //  for(int x = 0; x < 16; x++) {
-  //    std::cout << std::setfill('0') << std::setw(2) << SuperBlockIndex2DOpt(x,y,m_width) << " ";
-  //  }
-  //  std::cout << std::endl;
-  //}
-
   #pragma omp parallel for default(shared)
   for(int y=0;y<tidY;y++)
     for(int x=0;x<tidX;x++)
