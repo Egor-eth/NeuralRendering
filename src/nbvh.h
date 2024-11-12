@@ -42,7 +42,7 @@ public:
   void InferenceNetwork(std::vector<float> inputData, std::vector<float>& outputData);
 
   void Clear (uint32_t a_width, uint32_t a_height, const char* a_what) override;
-  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum) override {};
+  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum) override;
   void Render(uint32_t* imageData, float* depthData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum);
   void SetViewport(int a_xStart, int a_yStart, int a_width, int a_height) override;
 

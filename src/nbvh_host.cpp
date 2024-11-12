@@ -1,4 +1,5 @@
 #include "nbvh.h"
+#include "math.h"
 #include "hydraxml.h"
 #include "loader_utils/gltf_loader.h"
 #include "Timer.h"
@@ -326,9 +327,9 @@ void N_BVH::SetNetwork()
   nn.set_batch_size_for_evaluate(2048);
   nn.add_layer(std::make_shared<nn::DenseLayer>( 2, 64), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(64,  1), nn::Initializer::Siren);
 }
@@ -350,6 +351,29 @@ void N_BVH::InferenceNetwork(std::vector<float> inputData, std::vector<float>& o
 void N_BVH::Render(uint32_t* a_outColor, float* out_depth, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
 {
   CastRaySingleBlock(a_width*a_height, a_outColor, out_depth, a_passNum);
+}
+
+void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
+{
+  std::vector<float> nn_input, nn_output;
+  nn_input.resize(2 * a_width * a_height);
+  nn_output.resize(a_width * a_height);
+  for (int i=0; i<a_height; i++)
+  {
+    for (int j=0; j<a_width; j++)
+    {
+      nn_input[2*(i*a_width + j) + 0] = 2*(float)j/a_width-1;
+      nn_input[2*(i*a_width + j) + 1] = 2*(float)i/a_width-1;
+    }
+  }
+  InferenceNetwork(nn_input, nn_output);
+  for (int i=0; i<a_height; i++)
+  {
+    for (int j=0; j<a_width; j++)
+    {
+      a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[i*a_width + j] * 10));
+    }
+  }
 }
 
 void N_BVH::CastRaySingleBlock(uint32_t tidX, uint32_t * out_color, float* out_depth, uint32_t a_numPasses)
