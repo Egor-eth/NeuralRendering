@@ -9,7 +9,6 @@ int main(int argc, const char** argv)
     uint32_t HEIGHT = 1000;
 
     const char* scenePath    = argv[1];
-    //const char* meshPath     = "scenes/meshes/bunny.vsgf";
     const char* refImage = "pic_ref.bmp";
     const char* outImage = "pic_out.bmp";
 
@@ -17,7 +16,6 @@ int main(int argc, const char** argv)
     LiteImage::Image2D<float> depth_map(WIDTH, HEIGHT);
     std::shared_ptr<N_BVH> pRender = std::make_shared<N_BVH>();
 
-    pRender->SetAccelStruct(std::make_shared<BVH2CommonRT>());
     pRender->SetViewport(0,0,WIDTH,HEIGHT);
 
     std::cout << "[main]: load scene '" << scenePath << "'" << std::endl;
@@ -53,7 +51,7 @@ int main(int argc, const char** argv)
         }
     }
 
-    pRender->SetNetwork();
+    std::cout << "[main]: do training ..." << std::endl;
     pRender->TrainNetwork(train_input, train_output);
 
     LiteImage::Image2D<uint32_t> test_image(WIDTH, HEIGHT);

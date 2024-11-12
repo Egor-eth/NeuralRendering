@@ -1,5 +1,5 @@
 #include "nbvh.h"
-#include "math.h"
+#include "math_module.h"
 #include "hydraxml.h"
 #include "loader_utils/gltf_loader.h"
 #include "Timer.h"
@@ -17,7 +17,16 @@ using LiteMath::inverse4x4;
 
 N_BVH::N_BVH() 
 { 
-  m_pAccelStruct = nullptr;
+  m_pAccelStruct = std::make_shared<BVH2CommonRT>();
+
+  nn.set_batch_size_for_evaluate(2048);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 2, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(64,  1), nn::Initializer::Siren);
 }
 
 void N_BVH::SetViewport(int a_xStart, int a_yStart, int a_width, int a_height)
@@ -75,11 +84,15 @@ scene.LoadState(a_path) < 0
           )
     return false;
 
+  float3 camPos, camLookAt, camUp;
   for(auto cam : scene.Cameras())
   {
     float aspect   = float(m_width) / float(m_height);
     auto proj      = perspectiveMatrix(cam.fov, aspect, cam.nearPlane, cam.farPlane);
-    auto worldView = lookAt(float3(cam.pos), float3(cam.lookAt), float3(cam.up));
+    camPos = float3(cam.pos);
+    camLookAt = float3(cam.lookAt);
+    camUp = float3(cam.up);
+    auto worldView = lookAt(camPos, camLookAt, camUp);
 
     m_projInv      = inverse4x4(proj);
     m_worldViewInv = inverse4x4(worldView);
@@ -91,6 +104,7 @@ scene.LoadState(a_path) < 0
   trisPerObject.reserve(1000);
   m_totalTris = 0;
   m_pAccelStruct->ClearGeom();
+  sceneBBox = {};
   for(auto meshPath : scene.MeshFiles())
   {
     std::cout << "[LoadScene]: mesh = " << meshPath.c_str() << std::endl;
@@ -104,6 +118,10 @@ scene.LoadState(a_path) < 0
     (void)geomId; // silence "unused variable" compiler warnings
     m_totalTris += currMesh.indices.size()/3;
     trisPerObject.push_back(currMesh.indices.size()/3);
+    for (auto vPos: currMesh.vPos4f)
+    {
+      sceneBBox.include(vPos);
+    }
   }
   
   m_totalTrisVisiable = 0;
@@ -114,6 +132,12 @@ scene.LoadState(a_path) < 0
     m_totalTrisVisiable += trisPerObject[inst.geomId];
   }
   m_pAccelStruct->CommitScene();
+
+  std::cout << "[HydraXML]: camPos     = (" << camPos.x << "," << camPos.y << "," << camPos.z << ")" << std::endl;
+  std::cout << "[HydraXML]: camLookAt  = (" << camLookAt.x << "," << camLookAt.y << "," << camLookAt.z << ")" << std::endl;
+  std::cout << "[HydraXML]: camUp      = (" << camUp.x << "," << camUp.y << "," << camUp.z << ")" << std::endl;
+  std::cout << "[HydraXML]: scnBoxMin  = (" << sceneBBox.boxMin.x << "," << sceneBBox.boxMin.y << "," << sceneBBox.boxMin.z << ")" << std::endl;
+  std::cout << "[HydraXML]: scnBoxMax  = (" << sceneBBox.boxMax.x << "," << sceneBBox.boxMax.y << "," << sceneBBox.boxMax.z << ")" << std::endl;
 
   return true;
 }
@@ -242,7 +266,7 @@ bool N_BVH::LoadSceneGLTF(const std::string& a_path)
   m_pAccelStruct->ClearGeom();
   m_pAccelStruct->ClearScene();
 
-  Box4f sceneBBox;
+  sceneBBox = {};
   std::unordered_map<int, std::pair<uint32_t, BBox3f>> loaded_meshes_to_meshId;
   for(size_t i = 0; i < scene.nodes.size(); ++i)
   {
@@ -321,18 +345,6 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////NEURAL//PART//////////////////////////////////////////
-
-void N_BVH::SetNetwork()
-{
-  nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 2, 64), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64,  1), nn::Initializer::Siren);
-}
 
 void N_BVH::TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData)
 {

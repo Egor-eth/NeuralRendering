@@ -1,4 +1,4 @@
-#include "BVH2CommonRT.h"
+#include "bvh_tree.h"
 #include "gltf_loader.h"
 #include "IRenderer.h"
 #include "neural_core/src/neural_network.h"
@@ -37,7 +37,6 @@ public:
   bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor) override;
 #endif
 
-  void SetNetwork();
   void TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData);
   void InferenceNetwork(std::vector<float> inputData, std::vector<float>& outputData);
 
@@ -89,6 +88,7 @@ protected:
   uint32_t m_measureOverhead = 0;
 
   nn::NeuralNetwork nn;
+  LiteMath::Box4f sceneBBox = {};
 
   int m_gltfCamId = -1;
   LiteMath::float4x4 m_projInv;

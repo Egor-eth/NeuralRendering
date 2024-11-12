@@ -12,6 +12,8 @@ set(MODULE_SOURCES
         main.cpp
         nbvh.cpp
         nbvh_host.cpp
+        bvh_tree.cpp
+        bvh_tree_host.cpp
     ${LOADER_EXTERNAL_SRC}
 )
 
