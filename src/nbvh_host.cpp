@@ -20,7 +20,7 @@ N_BVH::N_BVH()
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
   nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 2, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 9, 64), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
@@ -348,8 +348,8 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 
 void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint, uint32_t samplesPerRay)
 {
-  inputData.resize(points * raysPerPoint * samplesPerRay * sizeof(float3));
-  outputData.resize(points * raysPerPoint * samplesPerRay * sizeof(float3));
+  inputData.resize(points * raysPerPoint * samplesPerRay * 3);
+  outputData.resize(points * raysPerPoint);
 
   for (uint32_t i = 0; i < points; ++i)
   {
@@ -372,21 +372,19 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     auto hitPoint = rayOrig + rayDir * hitObj.t;
 
     auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
-    for (uint32_t j = 1; j <= samplesPerRay; ++j)
+    for (uint32_t j = 0; j < samplesPerRay; ++j)
     {
-      auto sample = hitBBoxPoint1 + step * j;
-      inputData[(i * samplesPerRay + j) * sizeof(float3) + 0] = sample.x;
-      inputData[(i * samplesPerRay + j) * sizeof(float3) + 1] = sample.y;
-      inputData[(i * samplesPerRay + j) * sizeof(float3) + 2] = sample.z;
+      auto sample = hitBBoxPoint1 + step * (j + 1);
+      inputData[(i * samplesPerRay + j) * 3 + 0] = sample.x;
+      inputData[(i * samplesPerRay + j) * 3 + 1] = sample.y;
+      inputData[(i * samplesPerRay + j) * 3 + 2] = sample.z;
     }
 
-    outputData[i * sizeof(float3) + 0] = hitPoint.x;
-    outputData[i * sizeof(float3) + 1] = hitPoint.y;
-    outputData[i * sizeof(float3) + 2] = hitPoint.z;
+    outputData[i] = hitObj.t;
   }
 }
 
-void N_BVH::TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData)
+void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
   nn.train(inputData, outputData, 1000, 25000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
 }

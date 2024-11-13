@@ -12,7 +12,7 @@ T clip(T a, T b, T value)
     return value;
 }
 
-float3 sampleUniformBBox(BBox3f BBox)
+float3 sampleUniformBBox(LiteMath::BBox3f BBox)
 {
     float3 point;
     point.x = BBox.boxMin.x + (BBox.boxMax.x - BBox.boxMin.x) * (std::rand() / static_cast<float>(RAND_MAX));

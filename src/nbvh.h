@@ -40,7 +40,7 @@ public:
   //////////////////////////////NEURAL//PART/////////////////////////////////////
 
   void GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint = 1, uint32_t samplesPerRay = 3);
-  void TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData);
+  void TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData);
   void InferenceNetwork(std::vector<float> inputData, std::vector<float>& outputData);
 
   ///////////////////////////////////////////////////////////////////////////////

@@ -31,34 +31,20 @@ int main(int argc, const char** argv)
     
     std::cout << "[main]: do reference rendering ..." << std::endl;
     pRender->Render(image.data(), depth_map.data(), WIDTH, HEIGHT, "color", 1); 
-    std::cout << std::endl;
 
     std::cout << "[main]: save image to file ..." << std::endl;
     LiteImage::SaveImage(refImage, image);
 
+    std::cout << "[main]: generate dataset ..." << std::endl;
     std::vector<float> train_input, train_output;
-    train_input.resize(2 * WIDTH * HEIGHT);
-    train_output.resize(WIDTH * HEIGHT);
-    for (int i=0; i<HEIGHT; i++)
-    {
-        for (int j=0; j<WIDTH; j++)
-        {
-            train_input[2*(i*WIDTH + j) + 0] = 2*(float)j/WIDTH-1;
-            train_input[2*(i*WIDTH + j) + 1] = 2*(float)i/HEIGHT-1;
-            train_output[i*WIDTH + j] = depth_map.data()[i*WIDTH + j];
-            if (train_output[i*WIDTH + j] > 1000.f)
-                train_output[i*WIDTH + j] = 0.0f;
-        }
-    }
+    pRender->GenRayBBoxDataset(train_input, train_output, 10000, 1, 3);
 
     std::cout << "[main]: do training ..." << std::endl;
     pRender->TrainNetwork(train_input, train_output);
 
     LiteImage::Image2D<uint32_t> test_image(WIDTH, HEIGHT);
-
     std::cout << "[main]: do neural rendering ..." << std::endl;
     pRender->Render(test_image.data(), WIDTH, HEIGHT, "color", 1); 
-    std::cout << std::endl;
 
     std::cout << "[main]: save image to file ..." << std::endl;
     LiteImage::SaveImage(outImage, test_image);
