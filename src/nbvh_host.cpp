@@ -346,6 +346,46 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 ////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////NEURAL//PART//////////////////////////////////////////
 
+void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint, uint32_t samplesPerRay)
+{
+  inputData.resize(points * raysPerPoint * samplesPerRay * sizeof(float3));
+  outputData.resize(points * raysPerPoint * samplesPerRay * sizeof(float3));
+
+  for (uint32_t i = 0; i < points; ++i)
+  {
+    BBox3f BBox;
+    BBox.boxMax = float3(sceneBBox.boxMax.x, sceneBBox.boxMax.y, sceneBBox.boxMax.z);
+    BBox.boxMin = float3(sceneBBox.boxMin.x, sceneBBox.boxMin.y, sceneBBox.boxMin.z);
+
+    auto point1 = sampleUniformBBox(BBox);
+    auto point2 = sampleUniformBBox(BBox);
+    auto dir = point2 - point1;
+    auto hitBBox = BBox.Intersection(point1, dir, -INFINITY, +INFINITY);
+
+    auto hitBBoxPoint1 = point1 + dir * hitBBox.t1;
+    auto hitBBoxPoint2 = point1 + dir * hitBBox.t2;
+    auto rayDir_   = hitBBoxPoint2 - hitBBoxPoint1;
+    float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, 0.f);
+    float4 rayOrig = float4(hitBBoxPoint1.x, hitBBoxPoint1.y, hitBBoxPoint1.z, 1.f);
+
+    auto hitObj   = m_pAccelStruct->RayQuery_NearestHit(rayOrig, rayDir);
+    auto hitPoint = rayOrig + rayDir * hitObj.t;
+
+    auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
+    for (uint32_t j = 1; j <= samplesPerRay; ++j)
+    {
+      auto sample = hitBBoxPoint1 + step * j;
+      inputData[(i * samplesPerRay + j) * sizeof(float3) + 0] = sample.x;
+      inputData[(i * samplesPerRay + j) * sizeof(float3) + 1] = sample.y;
+      inputData[(i * samplesPerRay + j) * sizeof(float3) + 2] = sample.z;
+    }
+
+    outputData[i * sizeof(float3) + 0] = hitPoint.x;
+    outputData[i * sizeof(float3) + 1] = hitPoint.y;
+    outputData[i * sizeof(float3) + 2] = hitPoint.z;
+  }
+}
+
 void N_BVH::TrainNetwork(std::vector<float> inputData, std::vector<float>& outputData)
 {
   nn.train(inputData, outputData, 1000, 25000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
