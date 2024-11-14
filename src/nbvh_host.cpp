@@ -361,7 +361,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     auto point1 = sampleUniformBBox(BBox);
     auto point2 = sampleUniformBBox(BBox);
     auto dir = point2 - point1;
-    auto hitBBox = BBox.Intersection(point1, dir, -INFINITY, +INFINITY);
+    auto hitBBox = BBox.Intersection(point1, 1.f / dir, -INFINITY, +INFINITY);
 
     auto hitBBoxPoint1 = point1 + dir * hitBBox.t1;
     auto hitBBoxPoint2 = point1 + dir * hitBBox.t2;
@@ -371,6 +371,10 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
     auto hitObj   = m_pAccelStruct->RayQuery_NearestHit(rayOrig, rayDir);
     auto hitPoint = rayOrig + rayDir * hitObj.t;
+
+    //std::cout << "Point1:" << hitBBoxPoint1.x << " " << hitBBoxPoint1.y << " " << hitBBoxPoint1.z << std::endl;
+    //std::cout << "Point2:" << hitBBoxPoint2.x << " " << hitBBoxPoint2.y << " " << hitBBoxPoint2.z << std::endl;
+    //std::cout << "HitP:" << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
 
     auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
     for (uint32_t j = 0; j < samplesPerRay; ++j)
@@ -433,7 +437,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
       float3 initRayPos = float3(0,0,0);
       transform_ray3f(m_worldViewInv, &initRayPos, &initRayDir);
 
-      auto hitBBox = BBox.Intersection(initRayPos, initRayDir, -INFINITY, +INFINITY);
+      auto hitBBox = BBox.Intersection(initRayPos, 1.f / initRayDir, -INFINITY, +INFINITY);
 
       float3 hitBBoxPoint1, hitBBoxPoint2;
       if (fabs(hitBBox.t1) + fabs(hitBBox.t2) < 1000.f)
@@ -454,6 +458,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;
+        //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
       }
     }
   }
@@ -467,6 +472,8 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
       float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
       float depth = length(viewPos - hitPoint);
       a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, depth * 10));
+      //std::cout << "View: " << viewPos.x << " " << viewPos.y << " " << viewPos.z << std::endl;
+      //std::cout << "HitP:" << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
     }
   }
 }

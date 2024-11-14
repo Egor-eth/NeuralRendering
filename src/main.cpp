@@ -5,8 +5,8 @@
 
 int main(int argc, const char** argv)
 {
-    uint32_t WIDTH  = 1000;
-    uint32_t HEIGHT = 1000;
+    uint32_t WIDTH  = 100;
+    uint32_t HEIGHT = 100;
 
     const char* scenePath    = argv[1];
     const char* refImage = "pic_ref.bmp";
