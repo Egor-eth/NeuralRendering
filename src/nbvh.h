@@ -95,6 +95,7 @@ protected:
   uint32_t samplesPerRay = 3;
   LiteMath::Box4f sceneBBox = {};
 
+  LiteMath::float3 m_camPos, m_camLookAt, m_camUp;
   int m_gltfCamId = -1;
   LiteMath::float4x4 m_projInv;
   LiteMath::float4x4 m_worldViewInv;

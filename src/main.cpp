@@ -5,8 +5,8 @@
 
 int main(int argc, const char** argv)
 {
-    uint32_t WIDTH  = 100;
-    uint32_t HEIGHT = 100;
+    uint32_t WIDTH  = 1000;
+    uint32_t HEIGHT = 1000;
 
     const char* scenePath    = argv[1];
     const char* refImage = "pic_ref.bmp";
@@ -37,7 +37,7 @@ int main(int argc, const char** argv)
 
     std::cout << "[main]: generate dataset ..." << std::endl;
     std::vector<float> train_input, train_output;
-    pRender->GenRayBBoxDataset(train_input, train_output, 100000, 1);
+    pRender->GenRayBBoxDataset(train_input, train_output, 1000000, 1);
 
     std::cout << "[main]: do training ..." << std::endl;
     pRender->TrainNetwork(train_input, train_output);

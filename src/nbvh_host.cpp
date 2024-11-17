@@ -21,13 +21,14 @@ N_BVH::N_BVH()
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
   nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64, 64), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(64,  3), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128,  1), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SigmoidLayer>());
 }
 
 void N_BVH::SetViewport(int a_xStart, int a_yStart, int a_width, int a_height)
@@ -85,15 +86,14 @@ scene.LoadState(a_path) < 0
           )
     return false;
 
-  float3 camPos, camLookAt, camUp;
   for(auto cam : scene.Cameras())
   {
     float aspect   = float(m_width) / float(m_height);
     auto proj      = perspectiveMatrix(cam.fov, aspect, cam.nearPlane, cam.farPlane);
-    camPos = float3(cam.pos);
-    camLookAt = float3(cam.lookAt);
-    camUp = float3(cam.up);
-    auto worldView = lookAt(camPos, camLookAt, camUp);
+    m_camPos = float3(cam.pos);
+    m_camLookAt = float3(cam.lookAt);
+    m_camUp = float3(cam.up);
+    auto worldView = lookAt(m_camPos, m_camLookAt, m_camUp);
 
     m_projInv      = inverse4x4(proj);
     m_worldViewInv = inverse4x4(worldView);
@@ -134,9 +134,9 @@ scene.LoadState(a_path) < 0
   }
   m_pAccelStruct->CommitScene();
 
-  std::cout << "[HydraXML]: camPos     = (" << camPos.x << "," << camPos.y << "," << camPos.z << ")" << std::endl;
-  std::cout << "[HydraXML]: camLookAt  = (" << camLookAt.x << "," << camLookAt.y << "," << camLookAt.z << ")" << std::endl;
-  std::cout << "[HydraXML]: camUp      = (" << camUp.x << "," << camUp.y << "," << camUp.z << ")" << std::endl;
+  std::cout << "[HydraXML]: camPos     = (" << m_camPos.x << "," << m_camPos.y << "," << m_camPos.z << ")" << std::endl;
+  std::cout << "[HydraXML]: camLookAt  = (" << m_camLookAt.x << "," << m_camLookAt.y << "," << m_camLookAt.z << ")" << std::endl;
+  std::cout << "[HydraXML]: camUp      = (" << m_camUp.x << "," << m_camUp.y << "," << m_camUp.z << ")" << std::endl;
   std::cout << "[HydraXML]: scnBoxMin  = (" << sceneBBox.boxMin.x << "," << sceneBBox.boxMin.y << "," << sceneBBox.boxMin.z << ")" << std::endl;
   std::cout << "[HydraXML]: scnBoxMax  = (" << sceneBBox.boxMax.x << "," << sceneBBox.boxMax.y << "," << sceneBBox.boxMax.z << ")" << std::endl;
 
@@ -350,13 +350,16 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint)
 {
   inputData.resize(points * raysPerPoint * samplesPerRay * 3);
-  outputData.resize(points * raysPerPoint * 3);
+  outputData.resize(points * raysPerPoint);
 
   for (uint32_t i = 0; i < points; ++i)
   {
     BBox3f BBox;
     BBox.boxMax = float3(sceneBBox.boxMax.x, sceneBBox.boxMax.y, sceneBBox.boxMax.z);
     BBox.boxMin = float3(sceneBBox.boxMin.x, sceneBBox.boxMin.y, sceneBBox.boxMin.z);
+    float3 BBoxSize = BBox.boxMax - BBox.boxMin;
+    BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
+    BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
 
     auto point1 = sampleUniformBBox(BBox);
     auto point2 = sampleUniformBBox(BBox);
@@ -366,37 +369,34 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     auto hitBBoxPoint1 = point1 + dir * hitBBox.t1;
     auto hitBBoxPoint2 = point1 + dir * hitBBox.t2;
     auto rayDir_   = hitBBoxPoint2 - hitBBoxPoint1;
-    float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, 1000.f);
+    float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, MAXFLOAT);
     float4 rayOrig = float4(hitBBoxPoint1.x, hitBBoxPoint1.y, hitBBoxPoint1.z, 0.f);
 
     auto hitObj   = m_pAccelStruct->RayQuery_NearestHit(rayOrig, rayDir);
     auto hitPoint = rayOrig + rayDir * hitObj.t;
 
-    //std::cout << "Point1:" << hitBBoxPoint1.x << " " << hitBBoxPoint1.y << " " << hitBBoxPoint1.z << std::endl;
-    //std::cout << "Point2:" << hitBBoxPoint2.x << " " << hitBBoxPoint2.y << " " << hitBBoxPoint2.z << std::endl;
-    //std::cout << "HitP:" << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
-
-    auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
+    auto step = rayDir / static_cast<float>(samplesPerRay + 1);
     for (uint32_t j = 0; j < samplesPerRay; ++j)
     {
-      auto sample = hitBBoxPoint1 + step * (j + 1);
+      auto sample = rayOrig + step * (j + 1);
       inputData[(i * samplesPerRay + j) * 3 + 0] = sample.x;
       inputData[(i * samplesPerRay + j) * 3 + 1] = sample.y;
       inputData[(i * samplesPerRay + j) * 3 + 2] = sample.z;
     }
 
-    //outputData[i] = hitObj.t;
-    if (hitObj.t < 500.f)
+    if (hitObj.primId != uint32_t(-1))
     {
-      outputData[i * 3 + 0] = hitPoint.x;
-      outputData[i * 3 + 1] = hitPoint.y;
-      outputData[i * 3 + 2] = hitPoint.z;
+      outputData[i] = 1.f;
+      //outputData[i * 3 + 0] = hitPoint.x;
+      //outputData[i * 3 + 1] = hitPoint.y;
+      //outputData[i * 3 + 2] = hitPoint.z;
     }
     else
     {
-      outputData[i * 3 + 0] = 1000.f;
-      outputData[i * 3 + 1] = 1000.f;
-      outputData[i * 3 + 2] = 1000.f;
+      outputData[i] = 0.f;
+      //outputData[i * 3 + 0] = 0.f;
+      //outputData[i * 3 + 1] = 0.f;
+      //outputData[i * 3 + 2] = 0.f;
     }
 
   }
@@ -404,7 +404,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 1000, 25000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
+  nn.train(inputData, outputData, 1000, 10000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -420,36 +420,30 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
 {
   std::vector<float> nn_input, nn_output;
   nn_input.resize(a_width * a_height * samplesPerRay * 3);
-  nn_output.resize(a_width * a_height * 3);
+  nn_output.resize(a_width * a_height);
 
   BBox3f BBox;
   BBox.boxMax = float3(sceneBBox.boxMax.x, sceneBBox.boxMax.y, sceneBBox.boxMax.z);
   BBox.boxMin = float3(sceneBBox.boxMin.x, sceneBBox.boxMin.y, sceneBBox.boxMin.z);
-  
-  float3 viewPos = float3(0,0,0);
-  mymul4x3(m_worldViewInv, viewPos);
+  float3 BBoxSize = BBox.boxMax - BBox.boxMin;
+  BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
+  BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
+
 
   for (int i=0; i<a_height; i++)
   {
     for (int j=0; j<a_width; j++)
     {
       float3 initRayDir = EyeRayDirNormalized((float(j)+0.5f)/float(m_width), (float(i)+0.5f)/float(m_height), m_projInv);
-      float3 initRayPos = float3(0,0,0);
-      transform_ray3f(m_worldViewInv, &initRayPos, &initRayDir);
+      float3 initRayPos = float3(0.f, 0.f, 0.f);
 
+      transform_ray3f(m_worldViewInv, 
+                  &initRayPos, &initRayDir);
       auto hitBBox = BBox.Intersection(initRayPos, 1.f / initRayDir, -INFINITY, +INFINITY);
 
       float3 hitBBoxPoint1, hitBBoxPoint2;
-      if (fabs(hitBBox.t1) + fabs(hitBBox.t2) < 1000.f)
-      {
-        hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
-        hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
-      }
-      else
-      {
-        hitBBoxPoint1 = float3(0, 0, 0);
-        hitBBoxPoint2 = float3(0, 0, 0);
-      }
+      hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
+      hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
 
       auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(samplesPerRay + 1);
       for (uint32_t k = 0; k < samplesPerRay; ++k)
@@ -458,22 +452,23 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;
-        //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
       }
     }
   }
 
   nn.evaluate(nn_input, nn_output);
+    
+  float3 viewPos = m_camPos;
+  mymul4x3(m_worldViewInv, viewPos);
 
   for (int i=0; i<a_height; i++)
   {
     for (int j=0; j<a_width; j++)
     {
-      float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
-      float depth = length(viewPos - hitPoint);
-      a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, depth * 10));
-      //std::cout << "View: " << viewPos.x << " " << viewPos.y << " " << viewPos.z << std::endl;
-      //std::cout << "HitP:" << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
+      //float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
+      //float depth = length(viewPos - hitPoint);
+      a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[i * a_width + j] * 255.f));
+      //a_outColor[i*a_width + j] = nn_output[i * a_width + j] > 0.5 ? 0xff : 0u;
     }
   }
 }
