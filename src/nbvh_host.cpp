@@ -27,6 +27,10 @@ N_BVH::N_BVH()
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(128,  1), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SigmoidLayer>());
 }
@@ -105,7 +109,7 @@ scene.LoadState(a_path) < 0
   trisPerObject.reserve(1000);
   m_totalTris = 0;
   m_pAccelStruct->ClearGeom();
-  sceneBBox = {};
+
   for(auto meshPath : scene.MeshFiles())
   {
     std::cout << "[LoadScene]: mesh = " << meshPath.c_str() << std::endl;
@@ -119,16 +123,22 @@ scene.LoadState(a_path) < 0
     (void)geomId; // silence "unused variable" compiler warnings
     m_totalTris += currMesh.indices.size()/3;
     trisPerObject.push_back(currMesh.indices.size()/3);
-    for (auto vPos: currMesh.vPos4f)
-    {
-      sceneBBox.include(vPos);
-    }
+  }
+
+  LiteMath::Box4f BBox = {};
+  for (uint32_t i = 0; i < m_pAccelStruct->GetGeomNum(); ++i)
+  {
+    BBox.include(m_pAccelStruct->GetGeomBoxes()[2 * i]);
+    BBox.include(m_pAccelStruct->GetGeomBoxes()[2 * i + 1]);
   }
   
+  m_sceneBBox = {};
   m_totalTrisVisiable = 0;
   m_pAccelStruct->ClearScene();
   for(auto inst : scene.InstancesGeom())
   {
+    m_sceneBBox.include(inst.matrix * BBox.boxMax);
+    m_sceneBBox.include(inst.matrix * BBox.boxMin);
     m_pAccelStruct->AddInstance(inst.geomId, inst.matrix);
     m_totalTrisVisiable += trisPerObject[inst.geomId];
   }
@@ -137,8 +147,8 @@ scene.LoadState(a_path) < 0
   std::cout << "[HydraXML]: camPos     = (" << m_camPos.x << "," << m_camPos.y << "," << m_camPos.z << ")" << std::endl;
   std::cout << "[HydraXML]: camLookAt  = (" << m_camLookAt.x << "," << m_camLookAt.y << "," << m_camLookAt.z << ")" << std::endl;
   std::cout << "[HydraXML]: camUp      = (" << m_camUp.x << "," << m_camUp.y << "," << m_camUp.z << ")" << std::endl;
-  std::cout << "[HydraXML]: scnBoxMin  = (" << sceneBBox.boxMin.x << "," << sceneBBox.boxMin.y << "," << sceneBBox.boxMin.z << ")" << std::endl;
-  std::cout << "[HydraXML]: scnBoxMax  = (" << sceneBBox.boxMax.x << "," << sceneBBox.boxMax.y << "," << sceneBBox.boxMax.z << ")" << std::endl;
+  std::cout << "[HydraXML]: scnBoxMin  = (" << m_sceneBBox.boxMin.x << "," << m_sceneBBox.boxMin.y << "," << m_sceneBBox.boxMin.z << ")" << std::endl;
+  std::cout << "[HydraXML]: scnBoxMax  = (" << m_sceneBBox.boxMax.x << "," << m_sceneBBox.boxMax.y << "," << m_sceneBBox.boxMax.z << ")" << std::endl;
 
   return true;
 }
@@ -267,28 +277,28 @@ bool N_BVH::LoadSceneGLTF(const std::string& a_path)
   m_pAccelStruct->ClearGeom();
   m_pAccelStruct->ClearScene();
 
-  sceneBBox = {};
+  m_sceneBBox = {};
   std::unordered_map<int, std::pair<uint32_t, BBox3f>> loaded_meshes_to_meshId;
   for(size_t i = 0; i < scene.nodes.size(); ++i)
   {
     const tinygltf::Node node = gltfModel.nodes[scene.nodes[i]];
     auto identity = LiteMath::float4x4();
     LoadGLTFNodesRecursive(gltfModel, node, identity, 
-                           DataRefs(loaded_meshes_to_meshId, trisPerObject, sceneBBox, m_gltfCamId, m_worldViewInv, m_pAccelStruct, m_totalTris));
+                           DataRefs(loaded_meshes_to_meshId, trisPerObject, m_sceneBBox, m_gltfCamId, m_worldViewInv, m_pAccelStruct, m_totalTris));
   }
 
   // glTF scene can have no cameras specified
   if(m_gltfCamId == -1)
   {
-    std::tie(m_worldViewInv, m_projInv) = gltf_loader::makeCameraFromSceneBBox(m_width, m_height, sceneBBox);
+    std::tie(m_worldViewInv, m_projInv) = gltf_loader::makeCameraFromSceneBBox(m_width, m_height, m_sceneBBox);
   }
   
   const float3 camPos    = m_worldViewInv*float3(0,0,0);
   const float4 camLookAt = LiteMath::normalize(m_worldViewInv.get_col(2));
   std::cout << "[GLTF]: camPos2    = (" << camPos.x << "," << camPos.y << "," << camPos.z << ")" << std::endl;
   std::cout << "[GLTF]: camLookAt2 = (" << camLookAt.x << "," << camLookAt.y << "," << camLookAt.z << ")" << std::endl;
-  std::cout << "[GLTF]: scnBoxMin  = (" << sceneBBox.boxMin.x << "," << sceneBBox.boxMin.y << "," << sceneBBox.boxMin.z << ")" << std::endl;
-  std::cout << "[GLTF]: scnBoxMax  = (" << sceneBBox.boxMax.x << "," << sceneBBox.boxMax.y << "," << sceneBBox.boxMax.z << ")" << std::endl;
+  std::cout << "[GLTF]: scnBoxMin  = (" << m_sceneBBox.boxMin.x << "," << m_sceneBBox.boxMin.y << "," << m_sceneBBox.boxMin.z << ")" << std::endl;
+  std::cout << "[GLTF]: scnBoxMax  = (" << m_sceneBBox.boxMax.x << "," << m_sceneBBox.boxMax.y << "," << m_sceneBBox.boxMax.z << ")" << std::endl;
 
 
   m_pAccelStruct->CommitScene();
@@ -355,8 +365,8 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
   for (uint32_t i = 0; i < points; ++i)
   {
     BBox3f BBox;
-    BBox.boxMax = float3(sceneBBox.boxMax.x, sceneBBox.boxMax.y, sceneBBox.boxMax.z);
-    BBox.boxMin = float3(sceneBBox.boxMin.x, sceneBBox.boxMin.y, sceneBBox.boxMin.z);
+    BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
+    BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
     float3 BBoxSize = BBox.boxMax - BBox.boxMin;
     BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
     BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
@@ -382,10 +392,12 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
       inputData[(i * samplesPerRay + j) * 3 + 0] = sample.x;
       inputData[(i * samplesPerRay + j) * 3 + 1] = sample.y;
       inputData[(i * samplesPerRay + j) * 3 + 2] = sample.z;
+      //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
     }
 
     if (hitObj.primId != uint32_t(-1))
     {
+      //std::cout << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
       outputData[i] = 1.f;
       //outputData[i * 3 + 0] = hitPoint.x;
       //outputData[i * 3 + 1] = hitPoint.y;
@@ -404,7 +416,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 1000, 10000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
+  nn.train(inputData, outputData, 1000, 15000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -423,8 +435,8 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
   nn_output.resize(a_width * a_height);
 
   BBox3f BBox;
-  BBox.boxMax = float3(sceneBBox.boxMax.x, sceneBBox.boxMax.y, sceneBBox.boxMax.z);
-  BBox.boxMin = float3(sceneBBox.boxMin.x, sceneBBox.boxMin.y, sceneBBox.boxMin.z);
+  BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
+  BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
   float3 BBoxSize = BBox.boxMax - BBox.boxMin;
   BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
   BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
@@ -452,6 +464,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
         nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;
+        //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
       }
     }
   }
