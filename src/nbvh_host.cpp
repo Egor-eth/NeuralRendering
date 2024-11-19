@@ -368,8 +368,8 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
     BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
     float3 BBoxSize = BBox.boxMax - BBox.boxMin;
-    BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
-    BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
+    BBox.boxMax = BBox.boxMax + BBoxSize * 0.2;
+    BBox.boxMin = BBox.boxMin - BBoxSize * 0.2;
 
     auto point1 = sampleUniformBBox(BBox);
     auto point2 = sampleUniformBBox(BBox);
@@ -416,7 +416,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 1000, 15000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
+  nn.train(inputData, outputData, 1000, 5000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -430,17 +430,19 @@ void N_BVH::Render(uint32_t* a_outColor, float* out_depth, uint32_t a_width, uin
 
 void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
 {
-  std::vector<float> nn_input, nn_output;
+  std::vector<float> nn_input, nn_output, bboxMask;
   nn_input.resize(a_width * a_height * samplesPerRay * 3);
   nn_output.resize(a_width * a_height);
+  bboxMask.resize(a_width * a_height);
 
   BBox3f BBox;
   BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
   BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
   float3 BBoxSize = BBox.boxMax - BBox.boxMin;
-  BBox.boxMax = BBox.boxMax + BBoxSize * 0.1;
-  BBox.boxMin = BBox.boxMin - BBoxSize * 0.1;
+  BBox.boxMax = BBox.boxMax + BBoxSize * 0.2;
+  BBox.boxMin = BBox.boxMin - BBoxSize * 0.2;
 
+  float threshold = min(min(BBoxSize.x, BBoxSize.y), BBoxSize.z) * 0.2;
 
   for (int i=0; i<a_height; i++)
   {
@@ -453,18 +455,27 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
                   &initRayPos, &initRayDir);
       auto hitBBox = BBox.Intersection(initRayPos, 1.f / initRayDir, -INFINITY, +INFINITY);
 
-      float3 hitBBoxPoint1, hitBBoxPoint2;
-      hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
-      hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
-
-      auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(samplesPerRay + 1);
-      for (uint32_t k = 0; k < samplesPerRay; ++k)
+      if (hitBBox.t1 < hitBBox.t2 && length(initRayDir * (hitBBox.t2 - hitBBox.t1)) > threshold)
       {
-        auto sample = hitBBoxPoint1 + step * (k + 1);
-        nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
-        nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
-        nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;
-        //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
+        float3 hitBBoxPoint1, hitBBoxPoint2;
+        hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
+        hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
+
+        auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(samplesPerRay + 1);
+        for (uint32_t k = 0; k < samplesPerRay; ++k)
+        {
+          auto sample = hitBBoxPoint1 + step * (k + 1);
+          nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
+          nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
+          nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;
+          //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
+        }
+
+        bboxMask[i * a_width + j] = 1.f;
+      }
+      else
+      {
+        bboxMask[i * a_width + j] = 0.f;
       }
     }
   }
@@ -480,7 +491,10 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
     {
       //float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
       //float depth = length(viewPos - hitPoint);
-      a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[i * a_width + j] * 255.f));
+      if (bboxMask[i * a_width + j] > 0.5f)
+        a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[i * a_width + j] * 255.f));
+      else
+        a_outColor[i*a_width + j] = uint32_t(0u);
       //a_outColor[i*a_width + j] = nn_output[i * a_width + j] > 0.5 ? 0xff : 0u;
     }
   }
