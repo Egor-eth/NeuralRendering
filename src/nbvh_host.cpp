@@ -21,7 +21,7 @@ N_BVH::N_BVH()
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
   nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay * (ENCODE_LENGTH * 2 + 1), 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
@@ -359,7 +359,7 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 
 void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint)
 {
-  inputData.resize(points * raysPerPoint * samplesPerRay * 3);
+  inputData.resize(points * raysPerPoint * samplesPerRay * 3 * (ENCODE_LENGTH * 2 + 1));
   outputData.resize(points * raysPerPoint);
 
   for (uint32_t i = 0; i < points; ++i)
@@ -385,13 +385,11 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     auto hitObj   = m_pAccelStruct->RayQuery_NearestHit(rayOrig, rayDir);
     auto hitPoint = rayOrig + rayDir * hitObj.t;
 
-    auto step = rayDir / static_cast<float>(samplesPerRay + 1);
+    auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
     for (uint32_t j = 0; j < samplesPerRay; ++j)
     {
-      auto sample = rayOrig + step * (j + 1);
-      inputData[(i * samplesPerRay + j) * 3 + 0] = sample.x;
-      inputData[(i * samplesPerRay + j) * 3 + 1] = sample.y;
-      inputData[(i * samplesPerRay + j) * 3 + 2] = sample.z;
+      auto sample = hitBBoxPoint1 + step * (j + 1);
+      positional_encoding(sample, inputData.data() + (i * samplesPerRay + j) * 3 * (ENCODE_LENGTH * 2 + 1));
       //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
     }
 
@@ -431,7 +429,7 @@ void N_BVH::Render(uint32_t* a_outColor, float* out_depth, uint32_t a_width, uin
 void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
 {
   std::vector<float> nn_input, nn_output, bboxMask;
-  nn_input.resize(a_width * a_height * samplesPerRay * 3);
+  nn_input.resize(a_width * a_height * samplesPerRay * 3 * (ENCODE_LENGTH * 2 + 1));
   nn_output.resize(a_width * a_height);
   bboxMask.resize(a_width * a_height);
 
@@ -465,6 +463,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         for (uint32_t k = 0; k < samplesPerRay; ++k)
         {
           auto sample = hitBBoxPoint1 + step * (k + 1);
+          positional_encoding(sample, nn_input.data() + ((i * a_width + j) * samplesPerRay + k) * 3 * (ENCODE_LENGTH * 2 + 1));
           nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 0] = sample.x;
           nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 1] = sample.y;
           nn_input[((i * a_width + j) * samplesPerRay + k) * 3 + 2] = sample.z;

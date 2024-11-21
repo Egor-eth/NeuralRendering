@@ -92,7 +92,7 @@ protected:
   uint32_t m_measureOverhead = 0;
 
   nn::NeuralNetwork nn;
-  uint32_t samplesPerRay = 3;
+  uint32_t samplesPerRay = 7;
   LiteMath::Box4f m_sceneBBox = {};
 
   LiteMath::float3 m_camPos, m_camLookAt, m_camUp;
