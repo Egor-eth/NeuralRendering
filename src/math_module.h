@@ -46,3 +46,18 @@ void positional_encoding(float3 pos, float* res)
         std::copy(cos_enc.M, cos_enc.M + 3, res + sizeof(float3) * (2 + i * 2));
     }
 }
+
+LiteMath::Box4f getInstanceBBox(LiteMath::float4x4 transform, LiteMath::Box4f origBBox)
+{
+    LiteMath::Box4f instanceBBox = {};
+    instanceBBox.include(transform * origBBox.boxMin);
+    instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMin.y, origBBox.boxMin.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMin.y, origBBox.boxMax.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMax.y, origBBox.boxMin.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMax.y, origBBox.boxMax.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMax.x, origBBox.boxMin.y, origBBox.boxMin.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMax.x, origBBox.boxMin.y, origBBox.boxMax.z, 1.f));
+    instanceBBox.include(transform * float4(origBBox.boxMax.x, origBBox.boxMax.y, origBBox.boxMin.z, 1.f));
+    instanceBBox.include(transform * origBBox.boxMax);
+    return instanceBBox;
+}
