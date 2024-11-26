@@ -12,6 +12,7 @@ using LiteMath::float2;
 using LiteMath::float3;
 using LiteMath::float4;
 
+
 using LiteMath::perspectiveMatrix;
 using LiteMath::lookAt;
 using LiteMath::inverse4x4;
@@ -27,7 +28,9 @@ N_BVH::N_BVH()
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128,  1), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(128,  outputSize), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SigmoidLayer>());
 }
 
@@ -355,7 +358,7 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint)
 {
   inputData.resize(points * raysPerPoint * samplesPerRay * 3);
-  outputData.resize(points * raysPerPoint);
+  outputData.resize(points * raysPerPoint * outputSize * outputSize);
 
   for (uint32_t i = 0; i < points; ++i)
   {
@@ -393,14 +396,20 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     if (hitObj.primId != uint32_t(-1))
     {
       //std::cout << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
-      outputData[i] = 1.f;
+      outputData[i * outputSize] = 1.f;
+      outputData[i * outputSize + 1] = 0.f;
+      outputData[i * outputSize + 2] = 0.f;
+      outputData[i * outputSize + 3] = 0.f;
       //outputData[i * 3 + 0] = hitPoint.x;
       //outputData[i * 3 + 1] = hitPoint.y;
       //outputData[i * 3 + 2] = hitPoint.z;
     }
     else
     {
-      outputData[i] = 0.f;
+      outputData[i * outputSize] = 0.f;
+      outputData[i * outputSize + 1] = 0.f;
+      outputData[i * outputSize + 2] = 0.f;
+      outputData[i * outputSize + 3] = 0.f;
       //outputData[i * 3 + 0] = 0.f;
       //outputData[i * 3 + 1] = 0.f;
       //outputData[i * 3 + 2] = 0.f;
@@ -411,7 +420,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 1000, 5000, nn::OptimizerAdam(0.0001f), nn::Loss::MSE);
+  nn.train(inputData, outputData, 2048, 2500, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -427,7 +436,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
 {
   std::vector<float> nn_input, nn_output, bboxMask;
   nn_input.resize(a_width * a_height * samplesPerRay * 3);
-  nn_output.resize(a_width * a_height);
+  nn_output.resize(a_width * a_height * outputSize);
   bboxMask.resize(a_width * a_height);
 
   BBox3f BBox;
@@ -488,7 +497,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
       //float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
       //float depth = length(viewPos - hitPoint);
       if (bboxMask[i * a_width + j] > 0.5f)
-        a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[i * a_width + j] * 255.f));
+        a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize] * 255.f));
       else
         a_outColor[i*a_width + j] = uint32_t(0u);
       //a_outColor[i*a_width + j] = nn_output[i * a_width + j] > 0.5 ? 0xff : 0u;
