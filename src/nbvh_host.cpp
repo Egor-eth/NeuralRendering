@@ -397,9 +397,9 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
     {
       //std::cout << hitPoint.x << " " << hitPoint.y << " " << hitPoint.z << std::endl;
       outputData[i * outputSize] = 1.f;
-      outputData[i * outputSize + 1] = 0.f;
-      outputData[i * outputSize + 2] = 0.f;
-      outputData[i * outputSize + 3] = 0.f;
+      outputData[i * outputSize + 1] = sinf(hitPoint.x);
+      outputData[i * outputSize + 2] = sinf(hitPoint.y);
+      outputData[i * outputSize + 3] = sinf(hitPoint.z);
       //outputData[i * 3 + 0] = hitPoint.x;
       //outputData[i * 3 + 1] = hitPoint.y;
       //outputData[i * 3 + 2] = hitPoint.z;
@@ -497,7 +497,16 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
       //float3 hitPoint = {nn_output[(i * a_width + j) * 3 + 0], nn_output[(i * a_width + j) * 3 + 1], nn_output[(i * a_width + j) * 3 + 2]};
       //float depth = length(viewPos - hitPoint);
       if (bboxMask[i * a_width + j] > 0.5f)
-        a_outColor[i*a_width + j] = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize] * 255.f));
+      {
+        bool visibility = nn_output[(i * a_width + j) * outputSize] > 0.5f;
+        if (visibility)
+        {
+          uint32_t r = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 1] * 255.f));
+          uint32_t g = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 2] * 255.f));
+          uint32_t b = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 3] * 255.f));
+          a_outColor[i*a_width + j] = (r << 8 | g) << 8 | b;
+        }
+      }
       else
         a_outColor[i*a_width + j] = uint32_t(0u);
       //a_outColor[i*a_width + j] = nn_output[i * a_width + j] > 0.5 ? 0xff : 0u;

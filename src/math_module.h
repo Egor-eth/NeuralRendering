@@ -51,7 +51,6 @@ LiteMath::Box4f getInstanceBBox(LiteMath::float4x4 transform, LiteMath::Box4f or
 {
     LiteMath::Box4f instanceBBox = {};
     instanceBBox.include(transform * origBBox.boxMin);
-    instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMin.y, origBBox.boxMin.z, 1.f));
     instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMin.y, origBBox.boxMax.z, 1.f));
     instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMax.y, origBBox.boxMin.z, 1.f));
     instanceBBox.include(transform * float4(origBBox.boxMin.x, origBBox.boxMax.y, origBBox.boxMax.z, 1.f));
