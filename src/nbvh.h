@@ -93,8 +93,9 @@ protected:
 
   nn::NeuralNetwork nn;
   uint32_t samplesPerRay = 7;
-  uint32_t outputSize = 4;
+  uint32_t outputSize = 2;
   LiteMath::Box4f m_sceneBBox = {};
+  float BBoxBound = 0.2;
 
   LiteMath::float3 m_camPos, m_camLookAt, m_camUp;
   int m_gltfCamId = -1;
