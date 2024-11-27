@@ -22,15 +22,17 @@ N_BVH::N_BVH()
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
   nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * samplesPerRay, 32), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(32, 32), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(32, 32), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(32, 32), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128,  outputSize), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(32, 256), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::SinLayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(256,  outputSize), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SigmoidLayer>());
 }
 
@@ -355,7 +357,11 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 ////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////NEURAL//PART//////////////////////////////////////////
 
-/*
+void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint)
+{
+  inputData.resize(points * raysPerPoint * samplesPerRay * 3);
+  outputData.resize(points * raysPerPoint * outputSize * outputSize);
+
   BBox3f BBox;
   BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
   BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
@@ -391,80 +397,48 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
     if (hitObj.primId != uint32_t(-1))
     {
       float3 hitPoint = (hitBBoxPoint1 + rayDir_ * hitObj.t - BBox.boxMin) / BBoxSize;
+
       // visibility
-      outputData[i * outputSize] = 1.f;
-      // distance
-      float k = static_cast<float>(samplesPerRay);
+      outputData[i * outputSize + 0] = 1.f;
+
+      // surface position (depth)
+
+      // local depth approach:
+      //float k = static_cast<float>(samplesPerRay);
       //outputData[i * outputSize + 1] = (hitObj.t * (k + 1.f) - 1.f) / (k - 1.f); // distance related to sampled points
+
+      // global coords approach:
+      outputData[i * outputSize + 1] = hitPoint.x;
+      outputData[i * outputSize + 2] = hitPoint.y;
+      outputData[i * outputSize + 3] = hitPoint.z;
+
+      // surface normal
+
+      uint32_t normalPacked = *reinterpret_cast<uint32_t*>(&hitObj.coords[2]);
+      float3 normal = (unpackNormal(normalPacked) + 1.f) * 0.5f;
+
+      //std::cout << normal.x << " " << normal.y << " " << normal.z << std::endl;
+
+      outputData[i * outputSize + 4] = normal.x;
+      outputData[i * outputSize + 5] = normal.y;
+      outputData[i * outputSize + 6] = normal.z;
     }
     else
     {
-      outputData[i * outputSize] = 0.f;
+      outputData[i * outputSize + 0] = 0.f;
       outputData[i * outputSize + 1] = 0.f;
       outputData[i * outputSize + 2] = 0.f;
       outputData[i * outputSize + 3] = 0.f;
+      outputData[i * outputSize + 4] = 0.f;
+      outputData[i * outputSize + 5] = 0.f;
+      outputData[i * outputSize + 6] = 0.f;
     }
-
-*/
-
-void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint)
-{
-  inputData.resize(points * raysPerPoint * samplesPerRay * 3);
-  outputData.resize(points * raysPerPoint * outputSize * outputSize);
-
-  for (uint32_t i = 0; i < points; ++i)
-  {
-    BBox3f BBox;
-    BBox.boxMax = float3(m_sceneBBox.boxMax.x, m_sceneBBox.boxMax.y, m_sceneBBox.boxMax.z);
-    BBox.boxMin = float3(m_sceneBBox.boxMin.x, m_sceneBBox.boxMin.y, m_sceneBBox.boxMin.z);
-    float3 BBoxSize = BBox.boxMax - BBox.boxMin;
-    BBox.boxMax = BBox.boxMax + BBoxSize * BBoxBound;
-    BBox.boxMin = BBox.boxMin - BBoxSize * BBoxBound;
-
-    auto point1 = sampleUniformBBox(BBox);
-    auto point2 = sampleUniformBBox(BBox);
-    auto dir = point2 - point1;
-    auto hitBBox = BBox.Intersection(point1, 1.f / dir, -INFINITY, +INFINITY);
-
-    auto hitBBoxPoint1 = point1 + dir * hitBBox.t1;
-    auto hitBBoxPoint2 = point1 + dir * hitBBox.t2;
-    auto rayDir_   = hitBBoxPoint2 - hitBBoxPoint1;
-    float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, MAXFLOAT);
-    float4 rayOrig = float4(hitBBoxPoint1.x, hitBBoxPoint1.y, hitBBoxPoint1.z, 0.f);
-
-    auto hitObj   = m_pAccelStruct->RayQuery_NearestHit(rayOrig, rayDir);
-    auto hitPoint = rayOrig + rayDir * hitObj.t;
-
-    auto step = rayDir_ / static_cast<float>(samplesPerRay + 1);
-    for (uint32_t j = 0; j < samplesPerRay; ++j)
-    {
-      auto sample = hitBBoxPoint1 + step * (j + 1);
-      //positional_encoding(sample, inputData.data() + (i * samplesPerRay + j) * 3 * (ENCODE_LENGTH * 2 + 1));
-      inputData[(i * samplesPerRay + j) * 3 + 0] = sample.x;
-      inputData[(i * samplesPerRay + j) * 3 + 1] = sample.y;
-      inputData[(i * samplesPerRay + j) * 3 + 2] = sample.z;
-    }
-
-    if (hitObj.primId != uint32_t(-1))
-    {
-      // visibility
-      outputData[i * outputSize] = 1.f;
-      // distance
-      float k = static_cast<float>(samplesPerRay);
-      outputData[i * outputSize + 1] = (hitObj.t * (k + 1.f) - 1.f) / (k - 1.f); // distance related to sampled points
-    }
-    else
-    {
-      outputData[i * outputSize] = 0.f;
-      outputData[i * outputSize + 1] = 0.f;
-    }
-
   }
 }
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 2048, 2048, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
+  nn.train(inputData, outputData, 2048, 10000, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -543,20 +517,24 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         bool visibility = nn_output[(i * a_width + j) * outputSize] > 0.5f;
         if (visibility)
         {
-          float3 sample1 = float3(nn_input[((i * a_width + j) * samplesPerRay) * 3 + 0], 
-                                  nn_input[((i * a_width + j) * samplesPerRay) * 3 + 1],
-                                  nn_input[((i * a_width + j) * samplesPerRay) * 3 + 2]);
-          float3 sample2 = float3(nn_input[((i * a_width + j) * samplesPerRay + samplesPerRay - 1) * 3 + 0],
-                                  nn_input[((i * a_width + j) * samplesPerRay + samplesPerRay - 1) * 3 + 1],
-                                  nn_input[((i * a_width + j) * samplesPerRay + samplesPerRay - 1) * 3 + 2]);
-          float3 hitPoint = sample1 + nn_output[(i * a_width + j) * outputSize + 1] * (sample2 - sample1);
+          float3 hitPoint = float3(nn_output[(i * a_width + j) * outputSize + 1],
+                                   nn_output[(i * a_width + j) * outputSize + 2],
+                                   nn_output[(i * a_width + j) * outputSize + 3]) * BBoxSize + BBox.boxMin;
+
           float depth = length(hitPoint - viewPos);
-          uint32_t r = uint32_t(clip(0.f, 255.f, (sinf(depth * 10.f) + 1.f) * 127.5f));
-          uint32_t g = uint32_t(0);
-          uint32_t b = 0xff - r;
-          //uint32_t r = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 1] * 255.f));
-          //uint32_t g = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 2] * 255.f));
-          //uint32_t b = uint32_t(clip(0.f, 255.f, nn_output[(i * a_width + j) * outputSize + 3] * 255.f));
+
+          float3 normal = normalize(float3(nn_output[(i * a_width + j) * outputSize + 4], 
+                                           nn_output[(i * a_width + j) * outputSize + 5],
+                                           nn_output[(i * a_width + j) * outputSize + 6]));
+
+          ///uint32_t r = int32_t(255.f - (depth - 3.3f) * 400.f);
+          ///uint32_t g = int32_t(255.f - (depth - 3.3f) * 400.f);
+          ///uint32_t b = int32_t(255.f - (depth - 3.3f) * 400.f);
+
+          uint8_t r = uint8_t(normal.x * 255.f);
+          uint8_t g = uint8_t(normal.y * 255.f);
+          uint8_t b = uint8_t(normal.z * 255.f);
+
           a_outColor[i*a_width + j] = (r << 8 | g) << 8 | b;
         }
       }

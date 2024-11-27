@@ -14,6 +14,7 @@ set(MODULE_SOURCES
         nbvh_host.cpp
         bvh_tree.cpp
         bvh_tree_host.cpp
+        math_module.cpp
     ${LOADER_EXTERNAL_SRC}
 )
 

@@ -1,5 +1,6 @@
 #include "nbvh.h"
 #include "render_common.h"
+#include "math_module.h"
 
 void N_BVH::CastRaySingle(uint32_t tidX, uint32_t* out_color, float* out_depth)
 {
@@ -36,8 +37,25 @@ void N_BVH::kernel_RayTrace(uint32_t tidX, const float4* rayPosAndNear,
     const uint XY = m_packedXY[tidX];
     const uint x  = (XY & 0x0000FFFF);
     const uint y  = (XY & 0xFFFF0000) >> 16;
-    out_color[y * m_width + x] = (hit.primId == 0xFFFFFFFF) ? 0 : m_palette[(hit.primId) % palette_size];
-    out_depth[y * m_width + x] = hit.t;
+
+    if (hit.primId != uint32_t(-1))
+    {
+      uint32_t normalPacked = *reinterpret_cast<uint32_t*>(&hit.coords[2]);
+      float3 normal = unpackNormal(normalPacked);
+
+      //out_color[y * m_width + x] = (hit.primId == 0xFFFFFFFF) ? 0 : m_palette[(hit.primId) % palette_size];
+      uint8_t r = uint8_t((normal.x + 1.f) * 0.5f * 255.f);
+      uint8_t g = uint8_t((normal.y + 1.f) * 0.5f * 255.f);
+      uint8_t b = uint8_t((normal.z + 1.f) * 0.5f * 255.f);
+      out_color[y * m_width + x] = (r << 8 | g) << 8 | b;
+      out_depth[y * m_width + x] = hit.t;
+    }
+    else
+    {
+      out_color[y * m_width + x] = 0u;
+      out_depth[y * m_width + x] = INF_POSITIVE;
+    }
+
   }
   else
   {

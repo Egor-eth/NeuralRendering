@@ -93,7 +93,7 @@ protected:
 
   nn::NeuralNetwork nn;
   uint32_t samplesPerRay = 7;
-  uint32_t outputSize = 2;
+  uint32_t outputSize = 7; // visibility (1) + surface (3) + normal (3)
   LiteMath::Box4f m_sceneBBox = {};
   float BBoxBound = 0.2;
 
@@ -102,6 +102,7 @@ protected:
   LiteMath::float4x4 m_projInv;
   LiteMath::float4x4 m_worldViewInv;
 
+  //std::shared_ptr<BVH2CommonRT> m_pAccelStruct; 
   std::shared_ptr<ISceneObject> m_pAccelStruct;
   std::vector<uint32_t>         m_packedXY;
 

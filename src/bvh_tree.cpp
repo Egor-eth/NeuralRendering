@@ -5,6 +5,7 @@
 #include <cfloat>
 
 #include "BVH2CommonRT.h"
+#include "math_module.h"
 
 void BVH2CommonRT::IntersectAllPrimitivesInLeaf(const float3 ray_pos, const float3 ray_dir,
                                                 float tNear, uint32_t instId, uint32_t geomId,
@@ -262,6 +263,27 @@ CRT_Hit BVH2CommonRT::RayQuery_NearestHit(float4 posAndNear, float4 dirAndFar)
       BVH2TraverseC32(ray_pos, ray_dir, posAndNear.w, instId, geomId, stack, &hit);
     }
   }
+
+  if (hit.primId != uint32_t(-1))
+  {
+    const uint2 a_geomOffsets = m_geomOffsets[hit.geomId];
+
+    const uint32_t A = m_indices[a_geomOffsets.x + hit.primId*3 + 0];
+    const uint32_t B = m_indices[a_geomOffsets.x + hit.primId*3 + 1];
+    const uint32_t C = m_indices[a_geomOffsets.x + hit.primId*3 + 2];
+
+    const float3 A_pos = to_float3(m_vertPos[a_geomOffsets.y + A]);
+    const float3 B_pos = to_float3(m_vertPos[a_geomOffsets.y + B]);
+    const float3 C_pos = to_float3(m_vertPos[a_geomOffsets.y + C]);
+
+    const float3 edge1 = B_pos - A_pos;
+    const float3 edge2 = C_pos - A_pos;
+
+    uint32_t normalPacked = packNormal(LiteMath::cross(edge1, edge2));
+
+    hit.coords[2] = *reinterpret_cast<float*>(&normalPacked);
+  }
+
 
   #ifdef ENABLE_METRICS
   m_stats.raysNumber++;
