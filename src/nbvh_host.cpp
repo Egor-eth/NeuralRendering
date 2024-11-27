@@ -536,26 +536,29 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
 
           float depth = length(hitPoint - viewPos);
 
-          float3 normal = normalize(float3(nn_output[(i * a_width + j) * m_outputSize + 4], 
+          float3 normal = float3(nn_output[(i * a_width + j) * m_outputSize + 4], 
                                            nn_output[(i * a_width + j) * m_outputSize + 5],
-                                           nn_output[(i * a_width + j) * m_outputSize + 6]));
+                                           nn_output[(i * a_width + j) * m_outputSize + 6]);
           
-          normal = (normal - 0.5f) * 2.f;
+          normal = normalize((normal - 0.5f) * 2.f);
 
           ///uint32_t r = int32_t(255.f - (depth - 3.3f) * 400.f);
           ///uint32_t g = int32_t(255.f - (depth - 3.3f) * 400.f);
           ///uint32_t b = int32_t(255.f - (depth - 3.3f) * 400.f);
 
-          float3 lambert = m_lightSourcePower * max(0.f, dot(normal, normalize(m_lightSourcePos - hitPoint)));
+          //float3 lambert = m_lightSourcePower * max(0.f, dot(normal, normalize(m_lightSourcePos - hitPoint)));
 
           //out_color[y * m_width + x] = (hit.primId == 0xFFFFFFFF) ? 0 : m_palette[(hit.primId) % palette_size];
-          uint8_t r = uint8_t(clip(0.f, 255.f, (lambert.x + 0.2f) * 255.f));
-          uint8_t g = uint8_t(clip(0.f, 255.f, (lambert.y + 0.2f) * 255.f));
-          uint8_t b = uint8_t(clip(0.f, 255.f, (lambert.z + 0.2f) * 255.f));
+          //uint8_t r = uint8_t(clip(0.f, 255.f, (lambert.x + 0.2f) * 255.f));
+          //uint8_t g = uint8_t(clip(0.f, 255.f, (lambert.y + 0.2f) * 255.f));
+          //uint8_t b = uint8_t(clip(0.f, 255.f, (lambert.z + 0.2f) * 255.f));
 
           //uint8_t r = uint8_t(normal.x * 255.f);
           //uint8_t g = uint8_t(normal.y * 255.f);
           //uint8_t b = uint8_t(normal.z * 255.f);
+          uint8_t r = uint8_t((normal.x + 1.f) * 0.5f * 255.f);
+          uint8_t g = uint8_t((normal.y + 1.f) * 0.5f * 255.f);
+          uint8_t b = uint8_t((normal.z + 1.f) * 0.5f * 255.f);
 
           a_outColor[i*a_width + j] = (r << 8 | g) << 8 | b;
         }

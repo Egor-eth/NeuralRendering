@@ -43,12 +43,16 @@ void N_BVH::kernel_RayTrace(uint32_t tidX, const float4* rayPosAndNear,
       uint32_t normalPacked = *reinterpret_cast<uint32_t*>(&hit.coords[2]);
       float3 normal = unpackNormal(normalPacked);
       float4 hitPoint = rayPos + hit.t * rayDir;
-      float3 lambert = m_lightSourcePower * max(0.f, dot(normal, normalize(m_lightSourcePos - float3(hitPoint.x, hitPoint.y, hitPoint.z))));
+      //float3 lambert = m_lightSourcePower * max(0.f, dot(normal, normalize(m_lightSourcePos - float3(hitPoint.x, hitPoint.y, hitPoint.z))));
 
       //out_color[y * m_width + x] = (hit.primId == 0xFFFFFFFF) ? 0 : m_palette[(hit.primId) % palette_size];
-      uint8_t r = uint8_t(clip(0.f, 255.f, (lambert.x + 0.2f) * 255.f));
-      uint8_t g = uint8_t(clip(0.f, 255.f, (lambert.y + 0.2f) * 255.f));
-      uint8_t b = uint8_t(clip(0.f, 255.f, (lambert.z + 0.2f) * 255.f));
+      ///uint8_t r = uint8_t(clip(0.f, 255.f, (lambert.x + 0.2f) * 255.f));
+      ///uint8_t g = uint8_t(clip(0.f, 255.f, (lambert.y + 0.2f) * 255.f));
+      ///uint8_t b = uint8_t(clip(0.f, 255.f, (lambert.z + 0.2f) * 255.f));
+      uint8_t r = uint8_t((normal.x + 1.f) * 0.5f * 255.f);
+      uint8_t g = uint8_t((normal.y + 1.f) * 0.5f * 255.f);
+      uint8_t b = uint8_t((normal.z + 1.f) * 0.5f * 255.f);
+
       out_color[y * m_width + x] = (r << 8 | g) << 8 | b;
       out_depth[y * m_width + x] = hit.t;
     }
