@@ -19,6 +19,8 @@ T clip(T a, T b, T value)
 
 float3 sampleUniformBBox(LiteMath::BBox3f BBox);
 
+float3 sampleUnitSphere();
+
 void positional_encoding(float3 pos, float* res);
 
 LiteMath::Box4f getInstanceBBox(LiteMath::float4x4 transform, LiteMath::Box4f origBBox);

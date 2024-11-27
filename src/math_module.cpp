@@ -12,6 +12,20 @@ float3 sampleUniformBBox(LiteMath::BBox3f BBox)
     return point;
 }
 
+float3 sampleUnitSphere()
+{
+    float3 point = {1.f, 1.f, 1.f};
+    
+    while (dot(point, point) >= 1.f)
+    {
+        point.x = (std::rand() / static_cast<float>(RAND_MAX) - 0.5f) * 2.f;
+        point.y = (std::rand() / static_cast<float>(RAND_MAX) - 0.5f) * 2.f;
+        point.z = (std::rand() / static_cast<float>(RAND_MAX) - 0.5f) * 2.f;
+    }
+
+    return normalize(point);
+}
+
 void positional_encoding(float3 pos, float* res)
 {
     uint32_t idx = 0;

@@ -39,7 +39,7 @@ public:
 
   //////////////////////////////NEURAL//PART/////////////////////////////////////
 
-  void GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points,  uint32_t raysPerPoint = 1);
+  void GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>& outputData, uint32_t points);
   void TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData);
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -92,10 +92,13 @@ protected:
   uint32_t m_measureOverhead = 0;
 
   nn::NeuralNetwork nn;
-  uint32_t samplesPerRay = 7;
-  uint32_t outputSize = 7; // visibility (1) + surface (3) + normal (3)
+  uint32_t m_samplesPerRay = 7;
+  uint32_t m_raysPerPoint = 1;
+  uint32_t m_outputSize = 7; // visibility (1) + surface (3) + normal (3)
   LiteMath::Box4f m_sceneBBox = {};
-  float BBoxBound = 0.2;
+  float m_BBoxBound = 0.2;
+  float3 m_lightSourcePos = float3(1.f, 1.f, 1.f);
+  float3 m_lightSourcePower = float3(1.f, 1.f, 1.f);
 
   LiteMath::float3 m_camPos, m_camLookAt, m_camUp;
   int m_gltfCamId = -1;
