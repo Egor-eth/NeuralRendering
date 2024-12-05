@@ -1,6 +1,6 @@
 #include "nbvh.h"
 #include "render_common.h"
-#include "math_module.h"
+#include "utils.h"
 
 void N_BVH::CastRaySingle(uint32_t tidX, uint32_t* out_color, float* out_depth)
 {
@@ -153,13 +153,4 @@ void N_BVH::PackXYBlock(uint tidX, uint tidY, uint a_passNum)
 void N_BVH::Clear(uint32_t a_width, uint32_t a_height, const char* a_what)
 {
   PackXYBlock(a_width, a_height, 1);
-}
-
-void N_BVH::SetPresets(const RenderPreset& a_presets)
-{
-  m_presets = a_presets;
-  if(a_presets.measureOverhead)
-    m_measureOverhead = 1;
-  else
-    m_measureOverhead = 0;
 }

@@ -5,7 +5,7 @@
 #include <cfloat>
 
 #include "BVH2CommonRT.h"
-#include "math_module.h"
+#include "utils.h"
 
 void BVH2CommonRT::IntersectAllPrimitivesInLeaf(const float3 ray_pos, const float3 ray_dir,
                                                 float tNear, uint32_t instId, uint32_t geomId,

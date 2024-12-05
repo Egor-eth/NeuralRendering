@@ -6,11 +6,11 @@
 #include <string>
 #include <memory>
 
-class N_BVH : public IRenderer
+class N_BVH
 {
 public:
     N_BVH();
-  const char* Name() const override;
+  const char* Name() const;
   
   virtual void SceneRestrictions(uint32_t a_restrictions[4]) const
   {
@@ -26,15 +26,15 @@ public:
   }
 
 #ifdef __ANDROID__
-  virtual bool LoadScene(const char* a_scenePath, AAssetManager* assetManager = nullptr) override;
+  virtual bool LoadScene(const char* a_scenePath, AAssetManager* assetManager = nullptr);
 #else
-  virtual bool LoadScene(const char* a_scenePath) override;
+  virtual bool LoadScene(const char* a_scenePath);
 #endif
 
 #ifdef __ANDROID__
-  bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor, AAssetManager* assetManager = nullptr) override;
+  bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor, AAssetManager* assetManager = nullptr);
 #else
-  bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor) override;
+  bool LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColMajor);
 #endif
 
   //////////////////////////////NEURAL//PART/////////////////////////////////////
@@ -44,21 +44,21 @@ public:
 
   ///////////////////////////////////////////////////////////////////////////////
 
-  void Clear (uint32_t a_width, uint32_t a_height, const char* a_what) override;
-  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum) override;
+  void Clear (uint32_t a_width, uint32_t a_height, const char* a_what);
+  void Render(uint32_t* imageData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum);
   void Render(uint32_t* imageData, float* depthData, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum);
-  void SetViewport(int a_xStart, int a_yStart, int a_width, int a_height) override;
+  void SetViewport(int a_xStart, int a_yStart, int a_width, int a_height);
 
-  void SetAccelStruct(std::shared_ptr<ISceneObject> a_customAccelStruct) override { m_pAccelStruct = a_customAccelStruct;}
-  std::shared_ptr<ISceneObject> GetAccelStruct() override { return m_pAccelStruct; }
+  void SetAccelStruct(std::shared_ptr<ISceneObject> a_customAccelStruct) {};
+  std::shared_ptr<ISceneObject> GetAccelStruct() { return m_pAccelStruct; }
 
-  void GetExecutionTime(const char* a_funcName, float a_out[4]) override;
+  void GetExecutionTime(const char* a_funcName, float a_out[4]);
   
   #ifndef KERNEL_SLICER
-  CustomMetrics GetMetrics() const override;
+  CustomMetrics GetMetrics() const;
   #endif
 
-  void CommitDeviceData() override {}
+  void CommitDeviceData() {}
   
 protected:
 
@@ -73,8 +73,6 @@ protected:
   virtual void PackXYBlock(uint tidX, uint tidY, uint a_passNum);
   virtual void PackXY(uint tidX, uint tidY);
   virtual void kernel_PackXY(uint tidX, uint tidY, uint* out_pakedXY);
-  
-  void SetPresets(const RenderPreset& a_presets) override;
 
   #ifdef KERNEL_SLICER
   void CastRaySingle(uint32_t tidX, uint32_t* out_color __attribute__((size("tidX"))));
@@ -105,8 +103,8 @@ protected:
   LiteMath::float4x4 m_projInv;
   LiteMath::float4x4 m_worldViewInv;
 
-  //std::shared_ptr<BVH2CommonRT> m_pAccelStruct; 
-  std::shared_ptr<ISceneObject> m_pAccelStruct;
+  std::shared_ptr<BVH2CommonRT> m_pAccelStruct; 
+  //std::shared_ptr<ISceneObject> m_pAccelStruct;
   std::vector<uint32_t>         m_packedXY;
 
   // color palette to select color for objects based on mesh/instance id
@@ -128,7 +126,7 @@ protected:
   uint64_t m_totalTris         = 0;
   uint64_t m_totalTrisVisiable = 0;
 
-  uint32_t GetGeomNum() const override { return m_pAccelStruct->GetGeomNum(); };
-  uint32_t GetInstNum() const override { return m_pAccelStruct->GetInstNum(); };
-  const LiteMath::float4* GetGeomBoxes() const  override { return m_pAccelStruct->GetGeomBoxes(); };
+  uint32_t GetGeomNum() const { return m_pAccelStruct->GetGeomNum(); };
+  uint32_t GetInstNum() const { return m_pAccelStruct->GetInstNum(); };
+  const LiteMath::float4* GetGeomBoxes() const  { return m_pAccelStruct->GetGeomBoxes(); };
 };

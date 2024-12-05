@@ -1,6 +1,6 @@
 #include "nbvh.h"
 #include "render_common.h"
-#include "math_module.h"
+#include "utils.h"
 #include "hydraxml.h"
 #include "loader_utils/gltf_loader.h"
 #include "Timer.h"
@@ -11,7 +11,6 @@ using LiteMath::BBox3f;
 using LiteMath::float2;
 using LiteMath::float3;
 using LiteMath::float4;
-
 
 using LiteMath::perspectiveMatrix;
 using LiteMath::lookAt;
@@ -142,7 +141,7 @@ scene.LoadState(a_path) < 0
     m_pAccelStruct->AddInstance(inst.geomId, inst.matrix);
     m_totalTrisVisiable += trisPerObject[inst.geomId];
   }
-  m_pAccelStruct->CommitScene();
+  m_pAccelStruct->CommitScene(BuildQuality::BUILD_HIGH);
 
   std::cout << "[HydraXML]: camPos     = (" << m_camPos.x << "," << m_camPos.y << "," << m_camPos.z << ")" << std::endl;
   std::cout << "[HydraXML]: camLookAt  = (" << m_camLookAt.x << "," << m_camLookAt.y << "," << m_camLookAt.z << ")" << std::endl;
@@ -301,7 +300,7 @@ bool N_BVH::LoadSceneGLTF(const std::string& a_path)
   std::cout << "[GLTF]: scnBoxMax  = (" << m_sceneBBox.boxMax.x << "," << m_sceneBBox.boxMax.y << "," << m_sceneBBox.boxMax.z << ")" << std::endl;
 
 
-  m_pAccelStruct->CommitScene();
+  m_pAccelStruct->CommitScene(BuildQuality::BUILD_HIGH);
 
   return true;
 }
@@ -340,7 +339,7 @@ bool N_BVH::LoadSingleMesh(const char* a_meshPath, const float* transform4x4ColM
 
   m_pAccelStruct->ClearScene();
   m_pAccelStruct->AddInstance(geomId, mtransform);
-  m_pAccelStruct->CommitScene();
+  m_pAccelStruct->CommitScene(BuildQuality::BUILD_HIGH);
   
   float3 camPos  = float3(0,0,5);
   float aspect   = float(m_width) / float(m_height);
@@ -451,7 +450,9 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
-  nn.train(inputData, outputData, 2048, 10000, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
+  nn::TrainStatistics stats;
+  nn.train_epochs(inputData, outputData, stats, 512, 2, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
+  std::cout << "Resulting loss: " << stats.avg_loss << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
