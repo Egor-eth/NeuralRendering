@@ -90,7 +90,7 @@ protected:
   uint32_t m_measureOverhead = 0;
 
   nn::NeuralNetwork nn;
-  uint32_t m_samplesPerRay = 7;
+  uint32_t m_samplesPerRay = 2;
   uint32_t m_raysPerPoint = 1;
   uint32_t m_outputSize = 7; // visibility (1) + surface (3) + normal (3)
   LiteMath::Box4f m_sceneBBox = {};

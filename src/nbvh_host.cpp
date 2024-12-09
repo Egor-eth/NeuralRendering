@@ -20,14 +20,11 @@ N_BVH::N_BVH()
 { 
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
+  int L = 2, T = 8*8*8, F = 3, N_min = 4, N_max = 16;
+
   nn.set_batch_size_for_evaluate(2048);
-  nn.add_layer(std::make_shared<nn::DenseLayer>( 3 * m_samplesPerRay, 128), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::StackedHashGrid3DLayer>(m_samplesPerRay, L, T, F, N_min, N_max), nn::Initializer::He);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(m_samplesPerRay * L * F, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
   nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SinLayer>());
@@ -451,7 +448,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
   nn::TrainStatistics stats;
-  nn.train_epochs(inputData, outputData, stats, 512, 2, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
+  nn.train_epochs(inputData, outputData, stats, 512, 100, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
   std::cout << "Resulting loss: " << stats.avg_loss << std::endl;
 }
 
