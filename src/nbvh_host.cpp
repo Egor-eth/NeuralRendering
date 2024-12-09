@@ -18,18 +18,27 @@ using LiteMath::inverse4x4;
 
 N_BVH::N_BVH() 
 { 
+  nn::TensorProcessor::init(nn::TensorProcessor::Backend::GPU);
+
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
-  int L = 2, T = 8*8*8, F = 3, N_min = 4, N_max = 16;
+  int L = 8, T = 256, F = 8, N_min = 4, N_max = 64;
+  int int_size = 64;
 
   nn.set_batch_size_for_evaluate(2048);
   nn.add_layer(std::make_shared<nn::StackedHashGrid3DLayer>(m_samplesPerRay, L, T, F, N_min, N_max), nn::Initializer::He);
-  nn.add_layer(std::make_shared<nn::DenseLayer>(m_samplesPerRay * L * F, 128), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128, 128), nn::Initializer::Siren);
-  nn.add_layer(std::make_shared<nn::SinLayer>());
-  nn.add_layer(std::make_shared<nn::DenseLayer>(128,  m_outputSize), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::DenseLayer>(m_samplesPerRay * L * F, int_size), nn::Initializer::Siren);
+  // nn.add_layer(std::make_shared<nn::DenseLayer>(m_samplesPerRay * 3, 256), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::ReLULayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(int_size, int_size), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::ReLULayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(int_size, int_size), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::ReLULayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(int_size, int_size), nn::Initializer::Siren);
+  nn.add_layer(std::make_shared<nn::ReLULayer>());
+  nn.add_layer(std::make_shared<nn::DenseLayer>(int_size,  m_outputSize), nn::Initializer::Siren);
   nn.add_layer(std::make_shared<nn::SigmoidLayer>());
+
 }
 
 void N_BVH::SetViewport(int a_xStart, int a_yStart, int a_width, int a_height)
@@ -364,8 +373,8 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
   float3 BBoxSize = BBox.boxMax - BBox.boxMin;
   BBox.boxMax = BBox.boxMax + BBoxSize * m_BBoxBound;
   BBox.boxMin = BBox.boxMin - BBoxSize * m_BBoxBound;
+  BBoxSize = BBox.boxMax - BBox.boxMin;
 
-  
   for (uint32_t i = 0; i < points; ++i)
   {
     float3 point1 = sampleUniformBBox(BBox);
@@ -385,14 +394,17 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 
       auto hitBBoxPoint1 = point1 + dir * hitBBox.t1;
       auto hitBBoxPoint2 = point1 + dir * hitBBox.t2;
+
       auto rayDir_   = hitBBoxPoint2 - hitBBoxPoint1;
       float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, MAXFLOAT);
       float4 rayOrig = float4(hitBBoxPoint1.x, hitBBoxPoint1.y, hitBBoxPoint1.z, 0.f);
 
-      auto step = rayDir_ / static_cast<float>(m_samplesPerRay + 1);
+      auto step = rayDir_ / static_cast<float>(m_samplesPerRay);
       for (uint32_t j = 0; j < m_samplesPerRay; ++j)
       {
-        auto sample = hitBBoxPoint1 + step * (j + 1);
+        float3 sample = hitBBoxPoint1 + step * j;
+        sample = (sample - BBox.boxMin) / BBoxSize;
+
         //positional_encoding(sample, inputData.data() + (i * m_samplesPerRay + j) * 3 * (ENCODE_LENGTH * 2 + 1));
         inputData[((i * m_raysPerPoint + r) * m_samplesPerRay + j) * 3 + 0] = sample.x;
         inputData[((i * m_raysPerPoint + r) * m_samplesPerRay + j) * 3 + 1] = sample.y;
@@ -448,7 +460,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
   nn::TrainStatistics stats;
-  nn.train_epochs(inputData, outputData, stats, 512, 100, nn::OptimizerAdam(0.0001f), nn::Loss::NBVH, true);
+  nn.train_epochs(inputData, outputData, stats, 5000, 50, nn::OptimizerAdam(0.003f), nn::Loss::NBVH, true);
   std::cout << "Resulting loss: " << stats.avg_loss << std::endl;
 }
 
@@ -476,6 +488,7 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
   BBox.boxMin = BBox.boxMin - BBoxSize * m_BBoxBound;
 
   float threshold = min(min(BBoxSize.x, BBoxSize.y), BBoxSize.z) * m_BBoxBound;
+  BBoxSize = BBox.boxMax - BBox.boxMin;
 
   for (int i=0; i<a_height; i++)
   {
@@ -494,15 +507,16 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
         hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
 
-        auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(m_samplesPerRay + 1);
+        auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(m_samplesPerRay);
         for (uint32_t k = 0; k < m_samplesPerRay; ++k)
         {
-          auto sample = hitBBoxPoint1 + step * (k + 1);
+          auto sample = hitBBoxPoint1 + step * k;
+          sample = (sample - BBox.boxMin) / BBoxSize;
+
           //positional_encoding(sample, nn_input.data() + ((i * a_width + j) * m_samplesPerRay + k) * 3 * (ENCODE_LENGTH * 2 + 1));
           nn_input[((i * a_width + j) * m_samplesPerRay + k) * 3 + 0] = sample.x;
           nn_input[((i * a_width + j) * m_samplesPerRay + k) * 3 + 1] = sample.y;
           nn_input[((i * a_width + j) * m_samplesPerRay + k) * 3 + 2] = sample.z;
-          //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
         }
 
         bboxMask[i * a_width + j] = 1.f;

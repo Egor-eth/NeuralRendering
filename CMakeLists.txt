@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-option(ENABLE_VULKAN "Include GPU support for neural networks with Kernel Slicer" OFF)
+option(ENABLE_VULKAN "Include GPU support for neural networks with Kernel Slicer" ON)
 
 
 

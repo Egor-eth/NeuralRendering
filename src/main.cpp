@@ -37,7 +37,7 @@ int main(int argc, const char** argv)
 
     std::cout << "[main]: generate dataset ..." << std::endl;
     std::vector<float> train_input, train_output;
-    pRender->GenRayBBoxDataset(train_input, train_output, 100000);
+    pRender->GenRayBBoxDataset(train_input, train_output, 1'000'000);
 
     std::cout << "[main]: do training ..." << std::endl;
     pRender->TrainNetwork(train_input, train_output);
