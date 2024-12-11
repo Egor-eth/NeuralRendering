@@ -22,7 +22,7 @@ N_BVH::N_BVH()
 
   m_pAccelStruct = std::make_shared<BVH2CommonRT>();
 
-  int L = 8, T = 256, F = 8, N_min = 4, N_max = 64;
+  int L = 8, T = 8*8*8, F = 8, N_min = 4, N_max = 32;
   int int_size = 64;
 
   nn.set_batch_size_for_evaluate(2048);
@@ -399,10 +399,10 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
       float4 rayDir  = float4(rayDir_.x, rayDir_.y, rayDir_.z, MAXFLOAT);
       float4 rayOrig = float4(hitBBoxPoint1.x, hitBBoxPoint1.y, hitBBoxPoint1.z, 0.f);
 
-      auto step = rayDir_ / static_cast<float>(m_samplesPerRay);
+      auto step = rayDir_ / static_cast<float>(m_samplesPerRay + 1);
       for (uint32_t j = 0; j < m_samplesPerRay; ++j)
       {
-        float3 sample = hitBBoxPoint1 + step * j;
+        float3 sample = hitBBoxPoint1 + step * (j + 1);
         sample = (sample - BBox.boxMin) / BBoxSize;
 
         //positional_encoding(sample, inputData.data() + (i * m_samplesPerRay + j) * 3 * (ENCODE_LENGTH * 2 + 1));
@@ -460,7 +460,7 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
   nn::TrainStatistics stats;
-  nn.train_epochs(inputData, outputData, stats, 5000, 50, nn::OptimizerAdam(0.003f), nn::Loss::NBVH, true);
+  nn.train_epochs(inputData, outputData, stats, 5000, 5, nn::OptimizerAdam(0.003f), nn::Loss::NBVH, true);
   std::cout << "Resulting loss: " << stats.avg_loss << std::endl;
 }
 
@@ -507,11 +507,12 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
         hitBBoxPoint1 = initRayPos + initRayDir * hitBBox.t1;
         hitBBoxPoint2 = initRayPos + initRayDir * hitBBox.t2;
 
-        auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(m_samplesPerRay);
+        auto step = (hitBBoxPoint2 - hitBBoxPoint1) / static_cast<float>(m_samplesPerRay + 1);
         for (uint32_t k = 0; k < m_samplesPerRay; ++k)
         {
-          auto sample = hitBBoxPoint1 + step * k;
+          auto sample = hitBBoxPoint1 + step * (k + 1);
           sample = (sample - BBox.boxMin) / BBoxSize;
+          //std::cout << sample.x << " " << sample.y << " " << sample.z << std::endl;
 
           //positional_encoding(sample, nn_input.data() + ((i * a_width + j) * m_samplesPerRay + k) * 3 * (ENCODE_LENGTH * 2 + 1));
           nn_input[((i * a_width + j) * m_samplesPerRay + k) * 3 + 0] = sample.x;
