@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-option(ENABLE_VULKAN "Include GPU support for neural networks with Kernel Slicer" ON)
+option(ENABLE_VULKAN "Include GPU support for neural networks with Kernel Slicer" OFF)
 
 
 
@@ -32,6 +32,6 @@ add_subdirectory(${NREND_SRC_DIR})
 add_custom_target(nrend_copy_resources ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/resources)
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources
-                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${NREND_PROJECT_ROOT}/resources
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory ${NREND_PROJECT_ROOT}/resources
                                                     ${CMAKE_CURRENT_BINARY_DIR}/resources
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources)

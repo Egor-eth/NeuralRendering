@@ -460,7 +460,8 @@ void N_BVH::GenRayBBoxDataset(std::vector<float>& inputData, std::vector<float>&
 void N_BVH::TrainNetwork(std::vector<float>& inputData, std::vector<float>& outputData)
 {
   nn::TrainStatistics stats;
-  nn.train_epochs(inputData, outputData, stats, 5000, 5, nn::OptimizerAdam(0.003f), nn::Loss::NBVH, true);
+  nn.set_trainer(5000, nn::OptimizerAdam(0.003f), nn::Loss::NBVH);
+  nn.continue_train(inputData.data(), outputData.data(), &stats, inputData.size() / (m_samplesPerRay * 3), 5000, 2, false, nn::OptimizerAdam(0.003f), nn::Loss::NBVH, nn::Metric::Accuracy, true);
   std::cout << "Resulting loss: " << stats.avg_loss << std::endl;
 }
 
@@ -475,6 +476,9 @@ void N_BVH::Render(uint32_t* a_outColor, float* out_depth, uint32_t a_width, uin
 
 void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, const char* a_what, int a_passNum)
 {
+  profiling::Timer timer;
+  timer.restart();
+
   std::vector<float> nn_input, nn_output, bboxMask;
   nn_input.resize(a_width * a_height * m_samplesPerRay * 3);
   nn_output.resize(a_width * a_height * m_outputSize);
@@ -529,7 +533,13 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
     }
   }
 
+  std::cout << timer.getElapsedTime().asMilliseconds() << " ms for ray generation" << std::endl;
+  timer.restart();
+
   nn.evaluate(nn_input, nn_output);
+
+  std::cout << timer.getElapsedTime().asMilliseconds() << " ms for inference" << std::endl;
+  timer.restart();
     
   float3 viewPos = m_camPos;
   mymul4x3(m_worldViewInv, viewPos);
@@ -581,6 +591,8 @@ void N_BVH::Render(uint32_t* a_outColor, uint32_t a_width, uint32_t a_height, co
       //a_outColor[i*a_width + j] = nn_output[i * a_width + j] > 0.5 ? 0xff : 0u;
     }
   }
+
+  std::cout << timer.getElapsedTime().asMilliseconds() << " ms for rendering" << std::endl;
 }
 
 void N_BVH::CastRaySingleBlock(uint32_t tidX, uint32_t * out_color, float* out_depth, uint32_t a_numPasses)
